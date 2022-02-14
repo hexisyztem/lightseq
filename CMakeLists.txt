@@ -6,10 +6,8 @@ set(CMAKE_CUDA_ARCHITECTURES
     61
     70
     75
-    80
-    86
-    87)
-find_package(CUDA 11.6 REQUIRED)
+    80)
+find_package(CUDA 11.2 REQUIRED)
 
 option(FP16_MODE "inference with fp16" OFF)
 option(DEBUG_MODE "debug computation result" OFF)
@@ -67,5 +65,5 @@ add_subdirectory(lightseq/inference/proto)
 add_subdirectory(lightseq/inference/model)
 add_subdirectory(lightseq/inference/pywrapper)
 add_subdirectory(lightseq/inference/server)
-
+add_subdirectory(lightseq/inference/triton_backend)
 # add_subdirectory(examples/inference/cpp)
