@@ -31,14 +31,15 @@ class Gpt : public LSModel {
   lightseq::cuda::GptWeight<gpt_optype> tw_;
   std::set<std::string> available_sampling_methods = {"topk", "topp"};
 
+
+  int* get_result_ptr() const;
+  float* get_score_ptr() const;
+  int get_max_step() const { return tw_._max_step; }
+
  public:
   Gpt(const std::string weight_path, const int max_batch_size);
 
   ~Gpt();
-
-  const int* get_result_ptr();
-  const float* get_score_ptr();
-  const int get_max_step() { return tw_._max_step; }
 
   void Infer() override;
   void set_input_ptr(int index, void* input_ptr) override;

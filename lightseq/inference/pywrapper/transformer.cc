@@ -88,9 +88,9 @@ Transformer::~Transformer() {
   CHECK_GPU_ERROR(cudaStreamDestroy(stream_));
 }
 
-const int *Transformer::get_result_ptr() { return d_output_; }
+int *Transformer::get_result_ptr() const { return d_output_; }
 
-const float *Transformer::get_score_ptr() {
+float *Transformer::get_score_ptr() const {
   return decoder_->_p_d_alive_seq_score;
 }
 

@@ -65,8 +65,8 @@ Gpt::~Gpt() {
   CHECK_GPU_ERROR(cublasDestroy(hd_));
 }
 
-const int* Gpt::get_result_ptr() { return d_sample_id; }
-const float* Gpt::get_score_ptr() { return d_ppl; }
+int* Gpt::get_result_ptr() const { return d_sample_id; }
+float* Gpt::get_score_ptr() const { return d_ppl; }
 
 void Gpt::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
