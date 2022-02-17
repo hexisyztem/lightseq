@@ -92,6 +92,11 @@ add_library(
   TutorialMinimalBackend::triton-minimal-backend ALIAS triton-minimal-backend
 )
 
+set_target_properties(
+    triton-minimal-backend PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
+)
+
 target_include_directories(
   triton-minimal-backend
   PRIVATE

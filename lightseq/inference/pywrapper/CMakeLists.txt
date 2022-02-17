@@ -23,3 +23,8 @@ target_link_libraries(liblightseq PUBLIC bert_model)
 target_link_options(liblightseq PUBLIC $<DEVICE_LINK:-Xcompiler
                     -fvisibility=hidden>)
 target_include_directories(liblightseq PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+set_target_properties(
+  liblightseq PROPERTIES
+  LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
+)
