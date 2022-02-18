@@ -356,6 +356,7 @@ TRITONBACKEND_ModelInstanceExecute(
 
       // malloc GPU memory by triton api;
       void* d_input = instance_state->get_d_input(input_name);
+      void* moved_d_input = d_input;
       // get input tensor and cpy them into device; 当前实际只考虑了buffer_count = 1的情况
       for(uint32_t buffer_idx = 0; buffer_idx < buffer_count; buffer_idx ++) {
         const void *partial_buffer = nullptr;
@@ -369,9 +370,10 @@ TRITONBACKEND_ModelInstanceExecute(
         );
         
         ::lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(
-          d_input, partial_buffer, buffer_byte_size,
+          moved_d_input, partial_buffer, buffer_byte_size,
           cudaMemcpyHostToDevice)); 
-        d_input = (void*)(reinterpret_cast<uint64_t>(d_input) + buffer_byte_size); // 对应移动指针位置
+        ::lightseq::cuda::print_vec(static_cast<const int32_t*>(moved_d_input), "input", 10);
+        moved_d_input = (void*)(reinterpret_cast<uint64_t>(moved_d_input) + buffer_byte_size); // 对应移动指针位置
       }
 
       // match triton client input with lightseq input by input_name.
@@ -380,6 +382,7 @@ TRITONBACKEND_ModelInstanceExecute(
           continue;
         }
         instance_state->LightseqModel()->set_input_ptr(lightseq_input_idx, d_input);
+        // ::lightseq::cuda::print_vec(static_cast<const int32_t*>(d_input), "input", 10);
         instance_state->LightseqModel()->set_input_shape(lightseq_input_idx, std::vector<int>(shape, shape + dims_count));
       }
     }
@@ -387,7 +390,7 @@ TRITONBACKEND_ModelInstanceExecute(
     // 创建output在device上的执行内存
     for (int i = 0; i < instance_state->LightseqModel()->get_output_size(); i++) {
       std::string output_name = instance_state->LightseqModel()->get_output_name(i);
-      void* d_output = instance_state->get_d_output(output_name);
+      void* d_output = instance_state->get_d_output(output_name); // 获取到 triton_instance 管理的 d_output 显存
       instance_state->LightseqModel()->set_output_ptr(i, d_output);
     }
 
@@ -400,7 +403,7 @@ TRITONBACKEND_ModelInstanceExecute(
     // 创建response buffer
     TRITONBACKEND_Response* response = responses[idx];
     for (int output_idx = 0; output_idx < instance_state->LightseqModel()->get_output_size(); output_idx++) {
-      TRITONBACKEND_Output* output = nullptr; 
+      TRITONBACKEND_Output* output = nullptr;
       void* single_output_buffer = nullptr;
       const std::vector<int> lightseq_shape = instance_state->LightseqModel()->get_output_shape(output_idx);
       std::string output_name = instance_state->LightseqModel()->get_output_name(output_idx);
@@ -414,11 +417,11 @@ TRITONBACKEND_ModelInstanceExecute(
         "failed create an TRITONBACKEND_OutputBuffer"
       ); // 根据 output_name 创建 TRITONBACKEND_Output
 
-      int total_size = 1;
-      for (long unsigned int j = 0; j < lightseq_shape.size(); j++) {
-        total_size *= lightseq_shape[j];
+      uint32_t total_size = 1;
+      for (long unsigned int j = 0; j < transform_shape.size(); j++) {
+        total_size *= transform_shape[j];
       }
-      uint32_t buffer_byte_size = (uint32_t)total_size * sizeof(int);
+      uint32_t buffer_byte_size = total_size * TRITONSERVER_DataTypeByteSize(triton_datatype_);
       TRITONSERVER_MemoryType output_memory_type = TRITONSERVER_MEMORY_GPU;
       int64_t output_memory_type_id = 0;
       LOG_IF_ERROR(
@@ -433,6 +436,7 @@ TRITONBACKEND_ModelInstanceExecute(
 
         const void* d_output = static_cast<const void*>(instance_state->LightseqModel()->get_output_ptr(output_idx));
 
+        // ::lightseq::cuda::print_vec(static_cast<const float*>(d_output), output_name, 10);
         ::lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(
           single_output_buffer, d_output, buffer_byte_size,
             cudaMemcpyDeviceToHost)); // 这里指考虑了input_buffer, 后续需要对input_buffer进行移动
