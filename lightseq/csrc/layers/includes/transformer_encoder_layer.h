@@ -13,6 +13,7 @@
 #include "normalize_layer.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
+#include "tensor.h"
 
 template <typename T>
 class TransformerEncoderLayer {
@@ -23,7 +24,7 @@ class TransformerEncoderLayer {
                           float hidden_output_dropout_ratio,
                           float layer_norm_eps, bool pre_or_postLayerNorm,
                           std::string activation_fn,
-                          bool mask_future_tokens = false);
+                          bool mask_future_tokens = false, RuntimeStatus rs);
 
   virtual ~TransformerEncoderLayer();
 
@@ -150,22 +151,6 @@ class TransformerEncoderLayer {
     }
   }
 
-  void free_mem_buffer() {
-    // free local gpu memory
-    cuda_free(_gemmQKV_inp_ptr);
-    cuda_free(_qkv_ptr);
-    cuda_free(_soft_out_ptr);
-    cuda_free(_ctx_bufB_ptr);
-    cuda_free(_attn_o_inp_ptr);
-    cuda_free(_ff1_inp_ptr);
-    cuda_free(_relu_inp_ptr);
-    cuda_free(_ff2_inp_ptr);
-
-    // free shared gpu memory between layers
-    cuda_free(_shared_mem_ptr);
-    _shared_mem_ptr = nullptr;
-  }
-
   // const parameter between batch
   const size_t _layer_id;
   const size_t _hidden_size;
@@ -200,17 +185,21 @@ class TransformerEncoderLayer {
   StridedBatchGemm<T> _attn_scores;
   StridedBatchGemm<T> _attn_context;
 
-  // local GPU memory
-  T *_gemmQKV_inp_ptr;
-  T *_qkv_ptr;
-  T *_soft_out_ptr;
-  T *_ctx_bufB_ptr;
-  T *_attn_o_inp_ptr;
-  T *_ff1_inp_ptr;
-  T *_relu_inp_ptr;
-  T *_ff2_inp_ptr;
-  // shared GPU memory between layer
-  static T *_shared_mem_ptr;
+
+  LSTensor<T> _gemmQKV_inp_tensor;
+  LSTensor<T> _qkv_tensor;
+  LSTensor<T> _soft_out_tensor;
+  LSTensor<T> _ctx_bufB_tensor;
+  LSTensor<T> _attn_o_inp_tensor;
+  LSTensor<T> _ff1_inp_tensor;
+  LSTensor<T> _relu_inp_tensor;
+  LSTensor<T> _ff2_inp_tensor;
+  LSTensor<T> _input_tensor;
+  LSTensor<T>& _attn_inp_tensor;
+  LSTensor<T> _ffn_inp;
+  LSTensor<T>& _attn_out_tensor;
+  LSTensor<T> _output_tensor;
+  LSTensor<T> qkv_linear_output;
 
   // weights ptr
   const T *_attn_qkvw_ptr;
@@ -241,4 +230,5 @@ class TransformerEncoderLayer {
   T *_grad_output_b_ptr;
   T *_grad_ffn_nw_ptr;
   T *_grad_ffn_nb_ptr;
+
 };

@@ -9,7 +9,7 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
     float activation_dropout_ratio, float hidden_output_dropout_ratio,
     bool pre_or_postLayerNorm, std::string activation_fn,
-    bool mask_future_tokens)
+    bool mask_future_tokens, RuntimeStatus rs)
     : _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
       _max_seq_len(max_seq_len),
@@ -43,93 +43,146 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
           (T(1.0) / T(sqrt(_hidden_size / _heads))), T(0.0), CUBLAS_OP_T,
           CUBLAS_OP_N)),
       _attn_context(typename StridedBatchGemm<T>::Config(
-          T(1.0), T(0.0), CUBLAS_OP_N, CUBLAS_OP_N)) {
+          T(1.0), T(0.0), CUBLAS_OP_N, CUBLAS_OP_N)),
+      
+      _input_tensor(hidden_size * _max_batch_tokens, FixedMemory),
+      _output_tensor(hidden_size * _max_batch_tokens, FixedMemory),
+      _gemmQKV_inp_tensor(hidden_size * _max_batch_tokens, SharedMemory),
+      qkv_linear_output(3 * hidden_size * _max_batch_tokens, SharedMemory),
+      transform_qkv(3 * hidden_size * _max_batch_tokens, SharedMemory),
+      _soft_tensor(_max_batch_tokens * _heads * _max_seq_len, SharedMemory),
+      _attn_score(_max_batch_tokens * _heads * _max_seq_len, SharedMemory),
+      _context_score(_max_batch_tokens * hidden_size, SharedMemory), 
+      _transform_context(_max_batch_tokens * hidden_size, SharedMemory), 
+      _attn_out(_max_batch_tokens * hidden_size, SharedMemory),
+      _ff1_inp_tensor(_max_batch_tokens * hidden_size, SharedMemory), 
+       {
   assert(_hidden_size % _heads == 0);
   allocate_mem_buffer();
+
+  // attn_fw 
+  if (_pre_or_postLayerNorm) {
+    FW_REGIST_LIFE_CYCLE(_attn_ln, {_gemmQKV_inp_tensor, _attn_inp});
+  }
+  LSTensor<T> gemmQKV_inp_ptr = 
+      _pre_or_postLayerNorm ? _gemmQKV_inp_tensor : _attn_inp;
+  FW_REGIST_LIFE_CYCLE(_qkv_linear, {gemmQKV_inp_ptr, qkv_linear_output});
+  FW_REGIST_LIFE_CYCLE(launch_bias_add_transform_20314, {transform_qkv, qkv_linear_output});
+  FW_REGIST_LIFE_CYCLE(_attn_scores, {_soft_tensor, k_tf_tensor, q_tf_tensor});
+  FW_REGIST_LIFE_CYCLE(_softmax, {_soft_tensor});
+  FW_REGIST_LIFE_CYCLE(_attn_prob_dropout, {_attn_score, _soft_tensor});
+  FW_REGIST_LIFE_CYCLE(_attn_context, {_context_score, v_tf_tensor, _attn_score});
+  FW_REGIST_LIFE_CYCLE(launch_transform4d_0213, {_transform_context, _context_score});
+  FW_REGIST_LIFE_CYCLE(_attn_out_linear, {_transform_context, _attn_out});
+  FW_REGIST_LIFE_CYCLE(_attn_dropout, {_attn_out, _attn_out, _attn_inp});
+  if (!_pre_or_postLayerNorm) {
+    FW_REGIST_LIFE_CYCLE(_attn_ln, {_attn_out, _attn_out});
+  }
+
+  // ffn_fw 
+  if (_pre_or_postLayerNorm) { 
+    FW_REGIST_LIFE_CYCLE(_ffn_ln, {_ff1_inp, _attn_out});
+    FW_REGIST_LIFE_CYCLE(_ff1, {_ff1_inp, _relu_inp});
+  }
+  else {
+    FW_REGIST_LIFE_CYCLE(_ff1, {_attn_out, _relu_inp});
+  }
+  FW_REGIST_LIFE_CYCLE(_ffn_activation_dropout, {_ff2_inp, _relu_inp});
+  FW_REGIST_LIFE_CYCLE(_ff2, {_ff2_inp, _output_tensor});
+  FW_REGIST_LIFE_CYCLE(_ffn_dropout, {_output_tensor, _output_tensor, _attn_out});
+  if (!_pre_or_postLayerNorm) {
+    FW_REGIST_LIFE_CYCLE(_ffn_ln, {_output_tensor, _output_tensor});
+  }
+
+  if (rs == Training) {
+    BW_REGIST_LIFE_CYCLE(_ffn_dropout.d_bias_dropout_residual, {});
+  }
 }
 
 template <typename T>
-TransformerEncoderLayer<T>::~TransformerEncoderLayer() {
-  free_mem_buffer();
-}
+TransformerEncoderLayer<T>::~TransformerEncoderLayer() {}
 
 template <typename T>
-void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
+void TransformerEncoderLayer<T>::attn_layer_fw(LSTensor<T> attn_input,
                                                const T *input_mask_ptr,
-                                               T *output_ptr, T *buffer) {
-  T *q_tf_ptr = _qkv_ptr;
-  T *k_tf_ptr = q_tf_ptr + _batch_dim;
-  T *v_tf_ptr = k_tf_ptr + _batch_dim;
+                                               LSTensor<T> attn_out) {
+  LSTensor<T> q_tf_tensor = LSTensor(transform_qkv.tensor(), _batch_dim, _qkv_tensor.unique_id());
+  LSTensor<T> k_tf_tensor = LSTensor(transform_qkv.tensor() + _batch_dim, _batch_dim, _qkv_tensor.unique_id());
+  LSTensor<T> v_tf_tensor = LSTensor(transform_qkv.tensor() + 2 * _batch_dim, _batch_dim, _qkv_tensor.unique_id());
 
   if (_pre_or_postLayerNorm) {
-    _attn_ln.Forward(_gemmQKV_inp_ptr, input_ptr, _attn_nw_ptr, _attn_nb_ptr,
+    _attn_ln.Forward(_gemmQKV_inp_tensor.tensor(), attn_input.tensor(), _attn_nw_ptr, _attn_nb_ptr,
                      _batch_tokens, _stream);
   }
-  const T *gemmQKV_inp_ptr =
-      _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
-  _qkv_linear.Forward(_batch_tokens, gemmQKV_inp_ptr, _attn_qkvw_ptr, buffer,
+  LSTensor<T> gemmQKV_inp_ptr =
+      _pre_or_postLayerNorm ? _gemmQKV_inp_tensor : attn_input;
+  _qkv_linear.Forward(_batch_tokens, gemmQKV_inp_ptr.tensor(), _attn_qkvw_ptr, qkv_linear_output.tensor(),
                       _cublasHandle);
 
-  launch_bias_add_transform_20314<T>(q_tf_ptr, buffer, _attn_qkvb_ptr,
+  launch_bias_add_transform_20314<T>(transform_qkv.tensor(), qkv_linear_output.tensor(), _attn_qkvb_ptr,
                                      _batch_size, _seq_len, 3, _heads,
                                      _hidden_size / _heads, _stream);
 
   // attention scores, q*k
-  _attn_scores.Forward(_batch_heads, _soft_out_ptr, k_tf_ptr, q_tf_ptr,
+  _attn_scores.Forward(_batch_heads, _soft_tensor.tensor(), k_tf_tensor.tensor(), q_tf_tensor.tensor(),
                        _cublasHandle);
 
   // Softmax + Mask
-  _softmax.Forward(_soft_out_ptr, input_mask_ptr, _batch_size, _seq_len,
+  _softmax.Forward(_soft_tensor.tensor(), input_mask_ptr, _batch_size, _seq_len,
                    _seq_len, _stream);
 
   // attn prob dropout.
-  _attn_prob_dropout.dropout(_ctx_bufB_ptr, _soft_out_ptr,
+  _attn_prob_dropout.dropout(_attn_score.tensor(), _soft_tensor.tensor(),
                              _batch_heads * _seq_len * _seq_len, _stream);
 
   // attention context, score * v
-  _attn_context.Forward(_batch_heads, buffer, v_tf_ptr, _ctx_bufB_ptr,
+  _attn_context.Forward(_batch_heads, _context_score.tensor(), v_tf_tensor.tensor(), _attn_score.tensor(),
                         _cublasHandle);
 
   // [b, nh, s, ad] -> [b, s, nh, ad]
-  launch_transform4d_0213<T>(_attn_o_inp_ptr, buffer, _batch_size, _seq_len,
+  launch_transform4d_0213<T>(_transform_context.tensor(), _context_score.tensor(), _batch_size, _seq_len,
                              _hidden_size, _heads, 1, _stream);
 
-  _attn_out_linear.Forward(_batch_tokens, _attn_o_inp_ptr, _attn_ow_ptr,
-                           output_ptr, _cublasHandle);
+  _attn_out_linear.Forward(_batch_tokens, _transform_context.tensor(), _attn_ow_ptr,
+                           attn_out.tensor(), _cublasHandle);
 
-  _attn_dropout.bias_dropout_residual(output_ptr, output_ptr, input_ptr,
+  _attn_dropout.bias_dropout_residual(_attn_out.tensor(), _attn_out.tensor(), attn_input.tensor(),
                                       _attn_ob_ptr, _batch_tokens, _hidden_size,
                                       _stream);
   if (!_pre_or_postLayerNorm) {
     // in-place ln since ln-input will not be used in post-ln mode
-    _attn_ln.Forward(output_ptr, output_ptr, _attn_nw_ptr, _attn_nb_ptr,
+    _attn_ln.Forward(_attn_out.tensor(), _attn_out.tensor(), _attn_nw_ptr, _attn_nb_ptr,
                      _batch_tokens, _stream);
   }
 }
 
 template <typename T>
-void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
+void TransformerEncoderLayer<T>::ffn_layer_fw(LSTensor<T> ffn_inp, LSTensor<T> ffn_out) {
   // save _ff1_inp_ptr, _relu_inp_ptr, _ff2_inp_ptr for backward
-  if (_pre_or_postLayerNorm) {
-    _ffn_ln.Forward(_ff1_inp_ptr, inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
+  if (_pre_or_postLayerNorm) { // what if _pre_or_postLayerNorm is false
+    _ffn_ln.Forward(_ff1_inp.tensor(), ffn_inp.tensor(), _ffn_nw_ptr, _ffn_nb_ptr,
                     _batch_tokens, _stream);
-  }
-  _ff1.Forward(_batch_tokens, _ff1_inp_ptr, _inter_w_ptr, _relu_inp_ptr,
+    _ff1.Forward(_batch_tokens, _ff1_inp.tensor(), _inter_w_ptr, _relu_inp.tensor(),
                _cublasHandle);
+  }
+  else {
+    _ff1.Forward(_batch_tokens, ffn_inp.tensor(), _inter_w_ptr, _relu_inp.tensor(),
+               _cublasHandle);
+  }
 
   _ffn_activation_dropout.bias_act_dropout(
-      _ff2_inp_ptr, _relu_inp_ptr, _inter_b_ptr, _batch_tokens,
+      _ff2_inp.tensor(), _relu_inp.tensor(), _inter_b_ptr, _batch_tokens,
       _intermediate_size, _activation_fn, _stream);
 
-  _ff2.Forward(_batch_tokens, _ff2_inp_ptr, _output_w_ptr, out_ptr,
+  _ff2.Forward(_batch_tokens, _ff2_inp.tensor(), _output_w_ptr, ffn_out.tensor(),
                _cublasHandle);
 
-  _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
+  _ffn_dropout.bias_dropout_residual(ffn_out.tensor(), ffn_out.tensor(), ffn_inp.tensor(), _output_b_ptr,
                                      _batch_tokens, _hidden_size, _stream);
 
   if (!_pre_or_postLayerNorm) {
     // in-place ln since ln-input will not be used in post-ln mode
-    _ffn_ln.Forward(out_ptr, out_ptr, _ffn_nw_ptr, _ffn_nb_ptr, _batch_tokens,
+    _ffn_ln.Forward(ffn_out.tensor(), ffn_out.tensor(), _ffn_nw_ptr, _ffn_nb_ptr, _batch_tokens,
                     _stream);
   }
 }
@@ -139,21 +192,20 @@ void TransformerEncoderLayer<T>::Forward(const T *input_ptr,
                                          const T *input_mask_ptr, T *out_ptr) {
   _stream = Context::Instance().get_stream();
   _cublasHandle = Context::Instance().get_cublashandle();
-  T *attn_buffer = _shared_mem_ptr;  // 3 * _batch_dim
-  // _batch_dim
-  T *ffn_inp_ptr =
-      _pre_or_postLayerNorm ? _shared_mem_ptr + 3 * _batch_dim : _ff1_inp_ptr;
 
-  attn_layer_fw(input_ptr, input_mask_ptr, ffn_inp_ptr, attn_buffer);
+  _input_tensor.set_tensor(input_ptr);
+  _output_tensor.set_tensor(output_ptr);
+  
+  attn_layer_fw(input_tensor_, input_mask_ptr, _attn_out);
 
-  ffn_layer_fw(ffn_inp_ptr, out_ptr);
+  ffn_layer_fw(_attn_out, _output_tensor);
 }
 
 template <typename T>
-void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
+void TransformerEncoderLayer<T>::attn_layer_bw(LSTensor<T> input_ptr,
                                                const T *input_mask_ptr,
-                                               const T *grad_output_ptr,
-                                               T *grad_input_ptr, T *buffer) {
+                                               LSTensor<T> grad_output_ptr,
+                                               LSTensor<T> grad_input_ptr) {
   cudaStream_t streams[2] = {_stream, _stream};
   const T *q_tf_ptr = _qkv_ptr;
   const T *k_tf_ptr = q_tf_ptr + _batch_dim;
@@ -232,26 +284,26 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
 }
 
 template <typename T>
-void TransformerEncoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
-                                              const T *output_ptr,
-                                              T *grad_inp_ptr, T *buffer) {
+void TransformerEncoderLayer<T>::ffn_layer_bw(LSTensor<T> grad_output_tensor,
+                                              LSTensor<T> output_tensor,
+                                              LSTensor<T> grad_inp_tensor) {
   cudaStream_t streams[2] = {_stream, _stream};
 
-  T *grad_residual_ptr = buffer;
-  buffer += _batch_dim;
+  // T *grad_residual_ptr = buffer;
+  // buffer += _batch_dim;
 
-  T *grad_ff1_inp_ptr = buffer;
-  buffer += _batch_dim;
+  // T *grad_ff1_inp_ptr = buffer;
+  // buffer += _batch_dim;
 
-  T *grad_ff1_out_ptr = buffer;
+  // T *grad_ff1_out_ptr = buffer;
   // buffer += _batch_size * _seq_len * _intermediate_size;
 
   if (_pre_or_postLayerNorm) {
-    _ffn_dropout.d_bias_dropout_residual(grad_inp_ptr, _grad_output_b_ptr,
-                                         grad_output_ptr, _batch_tokens,
+    _ffn_dropout.d_bias_dropout_residual(grad_ffn_dropout.tensor(), _grad_output_b_ptr,
+                                         grad_output_tensor.tensor(), _batch_tokens,
                                          _hidden_size, _stream);
   } else {
-    _ffn_ln.Backward(_grad_ffn_nw_ptr, _grad_ffn_nb_ptr, grad_residual_ptr,
+    _ffn_ln.Backward(_grad_ffn_nw_ptr, _grad_ffn_nb_ptr, grad_residual_tensor.tensor(),
                      grad_output_ptr, nullptr, output_ptr, _ffn_nw_ptr,
                      _ffn_nb_ptr, _batch_tokens, streams);
     _ffn_dropout.d_bias_dropout_residual(grad_inp_ptr, _grad_output_b_ptr,
@@ -297,11 +349,15 @@ void TransformerEncoderLayer<T>::Backward(const T *grad_output_ptr,
   T *grad_ffn_inp_ptr = _shared_mem_ptr;
   T *buffer = grad_ffn_inp_ptr + _batch_dim;
 
+
+  grad_output_tensor.set_tensor(grad_output_ptr);
+  grad_input_tensor.set_tensor(grad_input_ptr);
+  grad_
   /*
   buffer size needed by ffn bw:
       2 * _batch_dim + _batch_size * _seq_len * _intermediate_size
   */
-  ffn_layer_bw(grad_output_ptr, output_ptr, grad_ffn_inp_ptr, buffer);
+  ffn_layer_bw(grad_output_tensor, output_ptr, grad_ffn_inp_ptr, buffer);
 
   /*
   buffer size needed by attn bw:
