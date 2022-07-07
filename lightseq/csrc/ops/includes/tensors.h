@@ -106,15 +106,17 @@ public:
         memory_type_ = mt;
     }
     // subtensor for attention transform
-    LSTensor(T* tensor_pointer, uintptr_t father_id = 0) {
+    LSTensor(T* tensor_pointer, int s, uintptr_t father_id = 0) {
         tensor_ = tensor_pointer;
         if(father_id != 0){
             unique_id_ = tensor_id_;
+            memory_type_ = FixedMemory;
         }
         else {
             unique_id_ = tensor_id_ ++;
+            memory_type_ = SharedMemory;
         }
-        memory_type_ = FixedMemory;
+        tensor_size_ = s * sizeof(T);
     }
     LSTensor(LSTensor& a) = default;
 
@@ -160,7 +162,7 @@ int LSTensor<T>::tensor_id_ = 0;
 
 
 template<class T>
-void regist_life_cycle(std::string oper_name, std::vector<LSTensor<T>> checkpoint_tensor, std::vector<LSTensor<T>> intermediate_tensor) {
+void regist_life_cycle(std::string oper_name, std::vector<LSTensor<T>> intermediate_tensor, std::vector<LSTensor<T>> checkpoint_tensor) {
     LSTensorUsage::update_operator_idx();
 
     for(auto tensor_: intermediate_tensor) {
@@ -172,6 +174,6 @@ void regist_life_cycle(std::string oper_name, std::vector<LSTensor<T>> checkpoin
     }
 }
 
-#define FW_REGIST_LIFE_CYCLE(func, tensor_) regist_life_cycle(#func, {}, tensor_)
+#define FW_REGIST_LIFE_CYCLE(func, tensor_) regist_life_cycle(#func, tensor_, {})
 
-#define BW_REGIST_LIFE_CYCLE(func, checkpoint, intermediate) regist_life_cycle(#func, checkpoint, intermediate)
+#define BW_REGIST_LIFE_CYCLE(func, intermediate, checkpoint) regist_life_cycle(#func, intermediate, checkpoint)
