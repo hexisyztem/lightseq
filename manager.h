@@ -1,8 +1,11 @@
-// #pragma once
+
+#pragma once
 
 #include <string>
 #include <memory>
 #include <map>
+#include <iostream>
+#include <vector>
 
 enum LSMemoryType {
     FixedMemory,
@@ -83,7 +86,7 @@ public:
             tensor_ptr.emplace(unique_id, tmp_pointer);
             size_t size = iter.second.size;
             tmp_pointer = tmp_pointer + size;
-            printf("inner update %zu\n", size);
+            printf("idx: %d, life cycle : [%d, %d], size: %zu\n", unique_id, iter.second.first_idx, iter.second.last_idx, size);
         }
     }
     size_t buffer_size() { return buffer_size_;}
