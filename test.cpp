@@ -25,4 +25,9 @@ int main(){
     for(int i = 0; i < 10; i ++){
         printf("%d ", *(out_2 + i));
     }
+
+    int* grad_out_ptr = (int*)malloc(10 * sizeof(int));
+    int* grad_inp_ptr = (int*)malloc(10 * sizeof(int));
+
+    
 }
