@@ -53,13 +53,14 @@ public:
         LayerBase<T>::construct_life_cycle(); // 计算生命周期，全局只执行一次。
         inp->set_tensor(inp_ptr);
         out->set_tensor(out_ptr);
+        
         /*
             A = inp + 1
             B = inp + 10
             C = inp + 100
             D = B + C
         */
-        
+
         op_a.Forward(1, size);
         op_b.Forward(10, size);
         op_c.Forward(100, size);
