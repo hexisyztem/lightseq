@@ -27,6 +27,11 @@ void BiasDropoutResOp<T1, T2>::forward() {
 
   launch_ls_dropout_res_bias<T1>(output, input, mask_ptr, bias, residual,
                                  _rows * _cols, _cols, RATIO(), stream);
+
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(stream));
+  // print_vec(output, this->name() + "/output", 5);
+
 }
 
 template <typename T1, typename T2>

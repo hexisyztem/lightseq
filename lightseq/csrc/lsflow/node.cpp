@@ -33,6 +33,9 @@ void Node::recursive_forward() {
   _fw_flag = true;
   // auto real_context_ptr = _context_ptr.lock();
   _context_ptr->update_node_idx();
+  
+  // printf("calculate forward: %s\n", _name.c_str());
+
   forward();
 }
 

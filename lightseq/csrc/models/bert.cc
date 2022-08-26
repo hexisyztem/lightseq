@@ -65,6 +65,7 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
   Variable* enc_emb = (*launch_enc_emb_op)(inp_tokens, token_emb, pos_emb, pad_mask, lang_emb, lang_id);
   for(auto iter: enc_layer_vec) {
     enc_emb = (*iter)(enc_emb, pad_mask);
+    std::cout << "enc_emb address: " << enc_emb << std::endl;
   }
   bert_out = enc_emb;
 }
@@ -82,12 +83,14 @@ void Bert::Infer() {
     iter->before_forward(batch_size, seq_len);
   }
   
-  launch_enc_emb_op->forward();
+  launch_enc_emb_op->recursive_forward();
   ::print_vec((OpType_*)launch_enc_emb_op->child(0)->value(), "launch_enc_emb_op", 10);
   for(auto iter: enc_layer_vec) {
     iter->forward();
-    std::string layer_name = iter->name();
-    ::print_vec((OpType_*)iter->output(0)->value(), layer_name + "-output", 10);
+    std::string layer_name = iter->output(0)->name();
+    ::print_vec((OpType_*)iter->output(0)->value(), layer_name, 5);
+    // char* addr = (char*)(iter->output(0)->value());
+    // std::cout << "layer output address: " << addr << std::endl;
   }
 
 

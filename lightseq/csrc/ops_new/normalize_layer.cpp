@@ -35,6 +35,19 @@ void NormalizeLayerOp<T1, T2>::forward() {
 
   launch_layer_norm(ln_res_val, vars_val, means_val, inp_val, gamma_val,
                     betta_val, _batch_tokens, _hidden_dim, stream);
+
+  if(_context_ptr->built()) {
+    cudaStreamSynchronize(_context_ptr->get_stream());
+    print_vec(ln_res_val, "normalize ans", 5);
+    // exit(-1);
+  }
+
+#if DEBUG == true
+  CHECK_GPU_ERROR(cudaStreamSynchronize(stream));
+  // print_vec(ln_res_val, this->name() + "ln_res_val", 10);
+
+#endif 
+
 }
 
 template <typename T1, typename T2>

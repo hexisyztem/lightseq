@@ -34,6 +34,8 @@ void LaunchEncEmbOp<T>::forward() {
   cuda::launch_enc_emb<T>(token_emb, pos_emb, inp_tokens, output_ptr, pad_mask,
                     _pad_id, _batch_size, _seq_len, _hidden_dim, _stream,
                     lang_emb, lang_id, _multilg_type); 
+
+  // printf("Running! launch_enc_emb\n");
 }
 
 template class LaunchEncEmbOp<float>;

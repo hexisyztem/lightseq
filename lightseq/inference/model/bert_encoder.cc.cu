@@ -135,6 +135,9 @@ void BertEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
     self_attention();
     ffn_add_norm();
   }
+
+  // print_vec(_p_d_output, "_p_d_output", 5);
+
   // last layer norm
   ker_norm_layer_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
@@ -172,6 +175,9 @@ void BertEncoder<OpType_>::self_attention() {
             "layer norm out(tail): ", 5);
 #endif
 
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(_p_d_q, "normlize ans", 5);
+
   /* ---step 1. qkv = ori_q * qkv_wei + bias, and reshape qkv for multi-head
    * gemm--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -180,6 +186,10 @@ void BertEncoder<OpType_>::self_attention() {
       _tw._hidden_size * 3, _p_d_q, _BType, _tw._hidden_size, &_fzero,
       _p_d_qkv_projected, _CType, _tw._hidden_size * 3, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(_p_d_enc_wei[_weight_offset + 2], "feedforwad weight", 5);
+  print_vec(_p_d_qkv_projected, "feedforwad ans", 5);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_qkv_projected, "self qkv(head): ", 5);
@@ -192,6 +202,12 @@ void BertEncoder<OpType_>::self_attention() {
       _batch_token_num, _tw._hidden_size, _stream, _p_d_qkv_projected,
       _p_d_enc_wei[_weight_offset + 3], _p_d_q, _max_batch_dim, _batch_seq_len,
       _tw._dim_per_head, _tw._head_num, _max_thread_per_block);
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(_p_d_q, "after transform q", 5);
+  print_vec(_p_d_k, "after transform k", 5);
+  print_vec(_p_d_v, "after transform v", 5);
+  exit(-1);
 
   /* ---step 2. correlation = q * k, perform softmax on correlation--- */
   CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
@@ -297,6 +313,8 @@ void BertEncoder<OpType_>::ffn_add_norm() {
       _tw._hidden_size, _p_d_ffn_buf2, _BType, _tw._inner_size, &_fone,
       _p_d_output, _CType, _tw._hidden_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+  print_vec(_p_d_output, "_p_d_output", 5);
   return;
 }
 

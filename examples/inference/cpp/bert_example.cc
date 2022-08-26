@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
   std::cout << "infer preprocessing finished" << std::endl;
 
   /* ---step5. infer and log--- */
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 1; i++) {
     auto start = std::chrono::high_resolution_clock::now();
     model->Infer();
     lightseq::cuda::print_time_duration(start, "one infer time", 0);
