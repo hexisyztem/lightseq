@@ -76,9 +76,20 @@ Bert::~Bert() {
 void Bert::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
 
-  // printf("Running!");
-
+  // before forward
+  launch_enc_emb_op->before_forward(batch_size, seq_len);
+  for(auto iter: enc_layer_vec) {
+    iter->before_forward(batch_size, seq_len);
+  }
+  
   launch_enc_emb_op->forward();
+  ::print_vec((OpType_*)launch_enc_emb_op->child(0)->value(), "launch_enc_emb_op", 10);
+  for(auto iter: enc_layer_vec) {
+    iter->forward();
+    std::string layer_name = iter->name();
+    ::print_vec((OpType_*)iter->output(0)->value(), layer_name + "-output", 10);
+  }
+
 
   // CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
   set_output_shape(0, {batch_size, seq_len, tw_._hidden_size});
@@ -87,7 +98,7 @@ void Bert::Infer() {
 void Bert::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
     case 0:
-      // encoder_->_p_d_token_id = static_cast<int *>(input_ptr);
+      inp_tokens->set_value((char*)input_ptr);
       break;
 
     default:
@@ -99,7 +110,7 @@ void Bert::set_input_ptr(int index, void *input_ptr) {
 void Bert::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
     case 0:
-      // encoder_->_p_d_output = static_cast<OpType_ *>(output_ptr);
+      bert_out->set_value((char*)output_ptr);
       break;
 
     default:
@@ -111,8 +122,7 @@ void Bert::set_output_ptr(int index, void *output_ptr) {
 const void *Bert::get_output_ptr(int index) {
   switch (index) {
     case 0:
-      // return static_cast<void *>(encoder_->_p_d_output);
-      return nullptr;
+      return static_cast<void *>(bert_out->value());
     default:
       throw std::runtime_error("invalid output index");
       break;

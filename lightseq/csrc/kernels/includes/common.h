@@ -1,6 +1,7 @@
 #pragma once
 #include <stdexcept>
 
+#include "cuda_util.h"
 #include <cuda.h>
 #include <cuda_fp16.h>
 

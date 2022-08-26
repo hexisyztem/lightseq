@@ -3,6 +3,7 @@
 #include <cuda_fp16.h>
 
 namespace lightseq {
+namespace cuda {
 
 void launch_split_multilg_request(const int *req, int *src_lang_id,
                                   int *trg_lang_id, int *src_token_id,
@@ -29,4 +30,5 @@ void launch_patch_emb(const T *conv_weight, const T *conv_bias,
                       int max_step, int hidden_dim, int channel_input,
                       cudaStream_t stream);
 
+}  // namespace cuda
 }  // namespace lightseq

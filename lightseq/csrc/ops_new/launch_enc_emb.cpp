@@ -18,25 +18,25 @@ Variable* LaunchEncEmbOp<T>::operator()(Variable* inp_tokens,
 
 template <typename T>
 void LaunchEncEmbOp<T>::forward() {
+  _context_ptr->build();
   cudaStream_t _stream = _context_ptr->get_stream();
 
   int* inp_tokens = (int*)parent(0)->value();
-  T* token_emb = (T*)parent(1)->value();
-  T* pos_emb = (T*)parent(2)->value();
+  const T* token_emb = (const T*)parent(1)->value();
+  const T* pos_emb = (const T* const)parent(2)->value();
   int* pad_mask = (int*)parent(3)->value();
   T* lang_emb = (T*)parent(4)->value();
   int* lang_id = (int*)parent(5)->value();
 
   T* output_ptr = (T*)child(0)->value();
 
-  launch_enc_emb<T>(token_emb, pos_emb, inp_tokens, output_ptr, pad_mask,
+
+  cuda::launch_enc_emb<T>(token_emb, pos_emb, inp_tokens, output_ptr, pad_mask,
                     _pad_id, _batch_size, _seq_len, _hidden_dim, _stream,
-                    lang_emb, lang_id, _multilg_type);
-  
-  print_vec(output_ptr, "launch_enc_emb", 10);
+                    lang_emb, lang_id, _multilg_type); 
 }
 
 template class LaunchEncEmbOp<float>;
-template class LaunchEncEmbOp<__half>;
+// template class LaunchEncEmbOp<__half>;
 
 }  // namespace lightseq

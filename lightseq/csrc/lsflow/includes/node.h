@@ -75,13 +75,22 @@ class Variable : public Node {
   bool enable_override_grad();
 };
 
+enum class OperatorType {
+  LaunchEmbOp,
+  NormalOp,
+};
+
 class Operator : public Node {
- public:
-  Operator(std::string name);
+protected:
+  OperatorType _op_type;
+public:
+  Operator(std::string name, OperatorType op_type = OperatorType::NormalOp);
   virtual ~Operator() {}
   void check_override_grad();
 
   void set_children(std::vector<Node*> children);
+
+  OperatorType op_type() { return _op_type; }
 
   Variable* child(int index) {
     return static_cast<Variable*>(_children[index]);

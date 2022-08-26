@@ -1,6 +1,5 @@
 #include "model_base.h"
 #include "util.h"
-#include "cuda_util.h"
 
 /**
 @file
@@ -37,7 +36,7 @@ int main(int argc, char* argv[]) {
   void* d_input;
   CHECK_GPU_ERROR(
       cudaMalloc(&d_input, sizeof(int) * batch_size * batch_seq_len));
-CHECK_GPU_ERROR(cudaMemcpy(
+  CHECK_GPU_ERROR(cudaMemcpy(
       d_input, host_input.data(), sizeof(int) * batch_size * batch_seq_len,
       cudaMemcpyHostToDevice));
 
@@ -51,18 +50,18 @@ CHECK_GPU_ERROR(cudaMemcpy(
     for (int j = 0; j < shape.size(); j++) {
       total_size *= shape[j];
     }
-    CHECK_GPU_ERROR(
+  CHECK_GPU_ERROR(
         cudaMalloc(&d_output, total_size * sizeof(int)));
     model->set_output_ptr(i, d_output);
   }
-  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
+  cudaStreamSynchronize(0);
   std::cout << "infer preprocessing finished" << std::endl;
 
   /* ---step5. infer and log--- */
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 1; i++) {
     auto start = std::chrono::high_resolution_clock::now();
     model->Infer();
-    lightseq::print_time_duration(start, "one infer time", 0);
+    // lightseq::cuda::print_time_duration(start, "one infer time", 0);
   }
 
   for (int i = 0; i < model->get_output_size(); i++) {

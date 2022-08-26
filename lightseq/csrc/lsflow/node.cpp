@@ -120,7 +120,8 @@ bool Variable::enable_override_grad() {
   }
 }
 
-Operator::Operator(std::string name) : Node(name) {
+Operator::Operator(std::string name, OperatorType op_type): 
+  Node(name), _op_type(op_type) {
   _context_ptr->add_op(this);
 }
 

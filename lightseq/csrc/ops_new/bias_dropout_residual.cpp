@@ -17,6 +17,8 @@ template <typename T1, typename T2>
 void BiasDropoutResOp<T1, T2>::forward() {
   cudaStream_t stream = _context_ptr->get_stream();
 
+  // printf("Running! BiasDropoutResOp name: %s\n", this->name().c_str());
+
   T1* input = (T1*)parent(0)->value();
   T1* bias = (T1*)parent(1)->value();
   T1* residual = (T1*)parent(2)->value();
