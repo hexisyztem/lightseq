@@ -8,7 +8,6 @@ that required by embedding layer in transformer model.
 Currently, fp16 and fp32 versions are provided
 */
 namespace lightseq {
-namespace cuda {
 /**
 @brief: ker_split_multilg_request
 the format of request in multilingual:
@@ -629,5 +628,4 @@ template void launch_patch_emb<__half>(
     int image_size, int batch_size, int max_step, int hidden_dim,
     int channel_input, cudaStream_t stream);
 
-}  // namespace cuda
 }  // namespace lightseq

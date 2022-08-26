@@ -74,4 +74,4 @@ if(USE_TRITONBACKEND)
   add_subdirectory(lightseq/inference/triton_backend)
 endif()
 
-# add_subdirectory(examples/inference/cpp)
+add_subdirectory(examples/inference/cpp)

@@ -8,6 +8,7 @@
 #include "manager.h"
 #include "layer.h"
 #include "node.h"
+#include "cuda_util.h"
 
 namespace lightseq {
 

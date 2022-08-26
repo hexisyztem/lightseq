@@ -39,9 +39,8 @@ template int MultiheadAttentionLayerWeight::load_para_and_grad(
     const __half* para_ptr, __half* grad_ptr);
 
 template <typename T>
-int MultiheadAttentionLayerWeight::load_params(
-    const std::vector<const T*>& para_vec) {  // for inference
-  int offset = 0;
+void MultiheadAttentionLayerWeight::load_params(
+    const std::vector<const T*>& para_vec, int &offset) {  // for inference
   _attn_nw_ptr = (char*)para_vec[offset++];
   _attn_nb_ptr = (char*)para_vec[offset++];
 
@@ -51,13 +50,13 @@ int MultiheadAttentionLayerWeight::load_params(
   _attn_ow_ptr = (char*)para_vec[offset++];
   _attn_ob_ptr = (char*)para_vec[offset++];
 
-  return offset;
+  return ;
 }
 
-template int MultiheadAttentionLayerWeight::load_params<float>(
-    const std::vector<const float*>& para_vec);
-template int MultiheadAttentionLayerWeight::load_params<__half>(
-    const std::vector<const __half*>& para_vec);
+template void MultiheadAttentionLayerWeight::load_params<float>(
+    const std::vector<const float*>& para_vec, int &offset);
+template void MultiheadAttentionLayerWeight::load_params<__half>(
+    const std::vector<const __half*>& para_vec, int &offset);
 
 template <typename T1, typename T2>
 MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(

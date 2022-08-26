@@ -15,6 +15,7 @@
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/random.h>
 
+#include "cuda_util.h"
 #include "hdf5.h"
 
 /**
@@ -64,33 +65,6 @@ static std::string _cudaGetErrorString(cublasStatus_t error) {
   }
   return "CUBLAS_UNKNOW";
 }
-
-template <typename T>
-void check_gpu_error(T result, char const* const func, const char* const file,
-                     int const line) {
-  if (result) {
-    throw std::runtime_error(std::string("[CUDA][ERROR] ") + +file + "(" +
-                             std::to_string(line) +
-                             "): " + (_cudaGetErrorString(result)) + "\n");
-  }
-}
-
-#define CHECK_GPU_ERROR(val) check_gpu_error((val), #val, __FILE__, __LINE__)
-
-/* Print vector stored in GPU memory, for debug */
-template <typename T>
-void print_vec(const thrust::device_vector<T>& outv, std::string outn,
-               int num_output_ele = -1);
-
-template <typename T>
-void print_vec(thrust::device_ptr<T> outv, std::string outn,
-               int num_output_ele);
-
-template <typename T>
-void print_vec(const T* outv, std::string outn, int num_output_ele);
-
-template <typename T>
-void print_vec(const T* outv, std::string outn, int start, int end);
 
 /* Print run time, for debug */
 void print_time_duration(

@@ -11,5 +11,5 @@ set(operator_files
     transform_0213.cpp)
 
 add_library(lightseq_operators STATIC ${operator_files})
-target_link_libraries(lightseq_operators PUBLIC cuda_kernels -lcublas)
+target_link_libraries(lightseq_operators PUBLIC cuda_kernels -lcublas lsflow)
 target_include_directories(lightseq_operators PUBLIC includes)

@@ -5,7 +5,6 @@
 #include <cuda_fp16.h>
 
 namespace lightseq {
-namespace cuda {
 
 const unsigned int WARP_REDUCE_MASK = 0xffffffff;
 const unsigned int WARP_SIZE = 32;
@@ -388,5 +387,4 @@ __forceinline__ __host__ __device__ void decompose_2dim(int src, int dim1,
   *id0 = src / dim1;
 }
 
-}  // namespace cuda
 }  // namespace lightseq

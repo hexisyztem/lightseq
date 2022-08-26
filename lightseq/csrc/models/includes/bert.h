@@ -1,20 +1,43 @@
-
+#pragma once
 #include "model_base.h"
+#include "bert_weight.h"
 #include "layer.h"
 #include "transformer_encoder_layer.h"
+#include "launch_enc_emb.h"
 
 #ifdef FP16_MODE
-const lightseq::cuda::OperationType bert_optype =
-    lightseq::cuda::OperationType::FP16;
+typedef __half OpType_;
 #else
-const lightseq::cuda::OperationType bert_optype =
-    lightseq::cuda::OperationType::FP32;
+typedef float OpType_;
 #endif
 
 namespace lightseq {
-class Bert : public LSModel {
- private:
- public:
+namespace cuda {
+
+class Bert: public LSModel {
+private:
+  BertWeight<OpType_> tw_;
+
+  LaunchEncEmbOp<OpType_>* launch_enc_emb_op;
+  std::vector<TransformerEncoderLayerPtr<OpType_, OpType_> > enc_layer_vec;
+  std::vector<TransformerEncoderLayerWeightPtr> enc_layer_wts;
+
+  ContextPtr context_ptr;
+
+  Variable* inp_tokens; // need to allocate
+  Variable* token_emb;
+  Variable* pos_emb;
+  Variable* pad_mask;   // need to allocate
+  Variable* lang_emb;
+  Variable* lang_id;
+
+  Variable* bert_out;
+
+  int _max_batch_size;
+
+  int* pad_mask_ptr;
+
+public:
   Bert(const std::string weight_path, const int max_batch_size);
 
   ~Bert();
@@ -31,4 +54,5 @@ class Bert : public LSModel {
 
 LSMODEL_REGISTER(Bert);
 
+} // namespace cuda
 }  // namespace lightseq

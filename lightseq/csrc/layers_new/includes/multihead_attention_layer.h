@@ -36,7 +36,7 @@ class MultiheadAttentionLayerWeight {
   int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 
   template <typename T>
-  int load_params(const std::vector<const T*>& para_vec);
+  void load_params(const std::vector<const T*>& para_vec, int &offset);
 };
 
 using MultiheadAttentionLayerWeightPtr =

@@ -19,10 +19,10 @@ void Tensor::set_tensor(char* inp) {
     printf("set_tensor for %s, which is SharedMemory!\n", _name.c_str());
     exit(-1);
   }
-  if (!inp) {
-    printf("set_tensor for %s with nullptr!\n", _name.c_str());
-    exit(-1);
-  }
+  // if (!inp) {
+  //   printf("set_tensor for %s with nullptr!\n", _name.c_str());
+  //   exit(-1);
+  // }
   _ptr = inp;
 }
 
@@ -30,10 +30,10 @@ void Tensor::set_tensor(const char* inp) { set_tensor(const_cast<char*>(inp)); }
 
 char* Tensor::tensor() {
   if (_mtype == FixedMemory) {
-    if (!_ptr) {
-      printf("%s is null when use, plz set first!\n", _name.c_str());
-      exit(-1);
-    }
+    // if (!_ptr) {
+    //   printf("%s is null when use, plz set first!\n", _name.c_str());
+    //   exit(-1);
+    // }
     return _ptr;
   }
   if (_ptr == nullptr) {

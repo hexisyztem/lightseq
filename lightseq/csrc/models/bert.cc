@@ -6,12 +6,12 @@ namespace cuda {
 Bert::Bert(const std::string weight_path, const int max_batch_size)
     : LSModel({"token_ids"}, {"encoder_output"}),
       _max_batch_size(max_batch_size) {
-  /* ---step1. init environment--- */
-  CHECK_GPU_ERROR(cudaStreamCreate(&stream_));
-  CHECK_GPU_ERROR(cublasCreate(&hd_));
-  CHECK_GPU_ERROR(cublasSetStream(hd_, stream_));
+  /* --- step.1 initial context --- */
+    
+  context_ptr.reset(new Context());
+  Context::set_thread_context(context_ptr);
 
-  /* ---step2. load model weights into GPU memory--- */
+  /* --- step.2 load model weights into GPU memory --- */
 
   // saved in custom proto file
   std::string model_weights_path = weight_path;
@@ -22,58 +22,72 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
 
   tw_.print_model_config();
 
-  /*
-    step3. instantiate encoder and decoder, init the gpu memory buffer.
-      using thrust vector to avoid manage gpu memory by hand
-  */
+  /* --- step.3 initial input Variable node --- */
 
-  // register device memory for inputs and outputs
-  CHECK_GPU_ERROR(
-      cudaMalloc(&d_input_, _max_batch_size * tw_._max_step * sizeof(int)));
-  CHECK_GPU_ERROR(cudaMalloc(&d_padding_mask_,
-                             _max_batch_size * tw_._max_step * sizeof(int)));
+  inp_tokens = new Variable("inp_tokens");
+  token_emb = new Variable("token_emb", (char*)tw_.get_src_emb_wei()[0]);
+  pos_emb = new Variable("pos_emb", (char*)tw_.get_src_emb_wei()[1]);
+  pad_mask_ptr = cuda_malloc<int>(_max_batch_size * tw_._max_step);
+  pad_mask = new Variable("pad_mask", (char*)pad_mask_ptr);
+  lang_emb = new Variable("lang_emb", (char*)tw_.get_src_emb_wei()[4]);
+  lang_id = new Variable("lang_id", nullptr);
 
-  CHECK_GPU_ERROR(cudaMalloc(
-      &d_encoder_output_, _max_batch_size * tw_._max_step * tw_._hidden_size *
-                              sizeof(optraits::DataType)));
+  /* --- step.4 initial layer weight --- */
 
-  encoder_ = std::make_shared<BertEncoder<bert_optype>>(
-      max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
-      stream_, hd_);
-  res = encoder_->check();
-  if (!res.empty()) {
-    throw std::runtime_error(res);
+  int offset = 0;
+  for (int i = 0; i < tw_._n_enc_layer; i ++) {
+    TransformerEncoderLayerWeightPtr enc_lyr_wt_(new TransformerEncoderLayerWeight(tw_._hidden_size, tw_._inner_size));
+    enc_lyr_wt_->load_params(tw_.get_enc_wei(), offset);
+    enc_layer_wts.push_back(enc_lyr_wt_);
   }
 
-  long buf_bytesize = encoder_->compute_buffer_bytesize();
-  std::cout << "Bert buf_bytesize: " << buf_bytesize << std::endl;
+  /* --- step.5 inital operator & layer --- */ 
+  int max_batch_tokens = tw_._max_step * _max_batch_size;
 
-  // encoder and decoder use the same buffer to save gpu memory useage
-  CHECK_GPU_ERROR(cudaMalloc(&d_buf_, (size_t)buf_bytesize));
-  encoder_->init_buffer(d_buf_);
-  CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
+  // initial launch_enc_emb_op
+  launch_enc_emb_op = new LaunchEncEmbOp<OpType_>(max_batch_tokens, tw_._padding_id, tw_._hidden_size, tw_._multilg_type);
+
+  float attn_prob_dropout_ratio = 0.0;
+  float activation_dropout_ratio = 0.0;
+  float hidden_dropout_ratio = 0.0;
+  
+  // initial transformer encoder layers
+  for (int idx = 0; idx < tw_._n_enc_layer; idx ++) {
+    TransformerEncoderLayerPtr<OpType_, OpType_> enc_layer_(new TransformerEncoderLayer<OpType_, OpType_>(
+      idx, max_batch_tokens, tw_._max_step, tw_._hidden_size, tw_._head_num,
+      tw_._inner_size, attn_prob_dropout_ratio, activation_dropout_ratio,
+      hidden_dropout_ratio, true, tw_._use_gelu ? "gelu" : "relu",
+      false, enc_layer_wts[idx])); 
+    enc_layer_vec.push_back(enc_layer_);
+  }
+
+  /* --- step.6 construct network --- */
+  Variable* enc_emb = (*launch_enc_emb_op)(inp_tokens, token_emb, pos_emb, pad_mask, lang_emb, lang_id);
+  for(auto iter: enc_layer_vec) {
+    enc_emb = (*iter)(enc_emb, pad_mask);
+  }
+  bert_out = enc_emb;
 }
 
 Bert::~Bert() {
-  CHECK_GPU_ERROR(cudaFree(d_input_));
-  CHECK_GPU_ERROR(cudaFree(d_padding_mask_));
-  CHECK_GPU_ERROR(cudaFree(d_encoder_output_));
-  CHECK_GPU_ERROR(cudaFree(d_buf_));
-  CHECK_GPU_ERROR(cublasDestroy(hd_));
-  CHECK_GPU_ERROR(cudaStreamDestroy(stream_));
+  cuda_free(pad_mask_ptr);
 }
 
 void Bert::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
-  encoder_->run_one_infer(batch_size, seq_len);
-  CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
+
+  // printf("Running!");
+
+  launch_enc_emb_op->forward();
+
+  // CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
   set_output_shape(0, {batch_size, seq_len, tw_._hidden_size});
 }
 
 void Bert::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
     case 0:
-      encoder_->_p_d_token_id = static_cast<int *>(input_ptr);
+      // encoder_->_p_d_token_id = static_cast<int *>(input_ptr);
       break;
 
     default:
@@ -85,7 +99,7 @@ void Bert::set_input_ptr(int index, void *input_ptr) {
 void Bert::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
     case 0:
-      encoder_->_p_d_output = static_cast<optraits::DataType *>(output_ptr);
+      // encoder_->_p_d_output = static_cast<OpType_ *>(output_ptr);
       break;
 
     default:
@@ -97,8 +111,8 @@ void Bert::set_output_ptr(int index, void *output_ptr) {
 const void *Bert::get_output_ptr(int index) {
   switch (index) {
     case 0:
-      return static_cast<void *>(encoder_->_p_d_output);
-
+      // return static_cast<void *>(encoder_->_p_d_output);
+      return nullptr;
     default:
       throw std::runtime_error("invalid output index");
       break;
@@ -141,11 +155,12 @@ DataType Bert::get_input_dtype(int index) {
 DataType Bert::get_output_dtype(int index) {
   switch (index) {
     case 0:
-      if (bert_optype == OperationType::FP32) {
-        return DataType::kFloat32;
-      } else {
+      #ifdef FP16_MODE
         return DataType::kFloat16;
-      }
+      #else 
+        return DataType::kFloat32;
+      #endif
+
       break;
 
     default:

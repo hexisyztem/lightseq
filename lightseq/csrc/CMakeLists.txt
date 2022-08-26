@@ -44,7 +44,7 @@ set(COMMON_HEADER_DIRS
     kernels/includes
     layers_new/includes
     lsflow/includes
-    # models/includes
+    models/includes
     ops_new/includes
     proto/includes
     tools/includes)
@@ -60,6 +60,7 @@ add_subdirectory(tools)
 add_subdirectory(kernels)
 add_subdirectory(layers_new)
 add_subdirectory(lsflow)
-# add_subdirectory(models)
+add_subdirectory(models)
 add_subdirectory(ops_new)
 add_subdirectory(proto)
+add_subdirectory(example)

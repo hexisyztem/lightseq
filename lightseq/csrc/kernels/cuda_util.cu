@@ -104,6 +104,8 @@ T *cuda_malloc(size_t ele_num) {
   return pdata;
 }
 
+template int *cuda_malloc<int>(size_t ele_num);
+
 template char *cuda_malloc<char>(size_t ele_num);
 
 template float *cuda_malloc<float>(size_t ele_num);
