@@ -29,10 +29,8 @@ void FeedForwardOp<T1, T2>::forward() {
   
   if(_context_ptr->built()) {
     cudaStreamSynchronize(_context_ptr->get_stream());
-    std::cout << "feedforward: " << input_ptr << " " << weights << " " << out_ptr << std::endl;
-    print_vec(input_ptr, "feedforward input_ptr", 5);
-    print_vec(weights, "feedforward weight", 5);
-    print_vec(out_ptr, "feedforward ans", 5);
+    print_vec(out_ptr, this->name() + " ans", 10);
+    printf("\n");
     // exit(-1);
   }
 }

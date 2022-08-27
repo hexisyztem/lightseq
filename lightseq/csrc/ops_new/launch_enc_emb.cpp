@@ -35,6 +35,13 @@ void LaunchEncEmbOp<T>::forward() {
                     _pad_id, _batch_size, _seq_len, _hidden_dim, _stream,
                     lang_emb, lang_id, _multilg_type); 
 
+
+  if(_context_ptr->built()) {
+    cudaStreamSynchronize(_context_ptr->get_stream());
+    print_vec(output_ptr, this->name() + " ans", 10);
+    printf("\n");
+  }
+
   // printf("Running! launch_enc_emb\n");
 }
 

@@ -59,11 +59,11 @@ void Context::build() {
   temporary_buffer_ = cuda_malloc<char>(mx_tensor_size);
 
   for (int idx = 0; idx < _model_ops.size(); idx++) {
-    _model_ops[idx]->forward();
+    _model_ops[idx]->recursive_forward();
   }
   if (is_training()) {
     for (int idx = _model_ops.size() - 1; idx >= 0; idx--) {
-      _model_ops[idx]->backward();
+      _model_ops[idx]->recursive_backward();
     }
   }
 

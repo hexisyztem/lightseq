@@ -173,4 +173,5 @@ float dequantize(unsigned char i, float scale, float clip_max);
 void dequantize_array(std::vector<unsigned char>& i8, std::vector<float>& f,
                       float clip_max, float quant_range, int start, int num);
 
+void transform_param_shape(float* origin, float* buffer, int row_size, int col_size);
 }  // namespace lightseq

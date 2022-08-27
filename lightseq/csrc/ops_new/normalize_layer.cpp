@@ -38,8 +38,8 @@ void NormalizeLayerOp<T1, T2>::forward() {
 
   if(_context_ptr->built()) {
     cudaStreamSynchronize(_context_ptr->get_stream());
-    print_vec(ln_res_val, "normalize ans", 5);
-    // exit(-1);
+    print_vec(ln_res_val, name() + " ans", 10);
+    printf("\n");
   }
 
 #if DEBUG == true

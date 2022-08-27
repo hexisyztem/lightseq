@@ -231,4 +231,18 @@ void dequantize_array(std::vector<unsigned char>& i8, std::vector<float>& f,
   }
 }
 
+void transform_param_shape(float* origin, float* buffer, int row_size, int col_size) {
+    int idx = 0;
+    printf("Running!\n");
+    for(int i = 0; i < row_size; i ++) {
+        for(int j = 0; j < col_size; j ++) {
+            *(buffer + j * row_size + i) = *(origin + idx);
+            idx ++;
+        }
+    }
+    for(int i = 0; i < row_size * col_size; i ++) {
+        *(origin + i) = *(buffer + i);
+    }
+}
+
 }  // namespace lightseq

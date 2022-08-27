@@ -84,13 +84,12 @@ void Bert::Infer() {
   }
   
   launch_enc_emb_op->recursive_forward();
-  ::print_vec((OpType_*)launch_enc_emb_op->child(0)->value(), "launch_enc_emb_op", 10);
   for(auto iter: enc_layer_vec) {
     iter->forward();
+    printf("===== encoder layer output =====\n");
     std::string layer_name = iter->output(0)->name();
     ::print_vec((OpType_*)iter->output(0)->value(), layer_name, 5);
-    // char* addr = (char*)(iter->output(0)->value());
-    // std::cout << "layer output address: " << addr << std::endl;
+    exit(0);
   }
 
 
