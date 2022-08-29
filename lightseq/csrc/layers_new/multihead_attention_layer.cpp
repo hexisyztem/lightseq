@@ -40,7 +40,7 @@ template int MultiheadAttentionLayerWeight::load_para_and_grad(
 
 template <typename T>
 void MultiheadAttentionLayerWeight::load_params(
-    const std::vector<const T*>& para_vec, int &offset) {  // for inference
+    const std::vector<const T*>& para_vec, int& offset) {  // for inference
   _attn_nw_ptr = (char*)para_vec[offset++];
   _attn_nb_ptr = (char*)para_vec[offset++];
 
@@ -50,20 +50,20 @@ void MultiheadAttentionLayerWeight::load_params(
   _attn_ow_ptr = (char*)para_vec[offset++];
   _attn_ob_ptr = (char*)para_vec[offset++];
 
-  return ;
+  return;
 }
 
 template void MultiheadAttentionLayerWeight::load_params<float>(
-    const std::vector<const float*>& para_vec, int &offset);
+    const std::vector<const float*>& para_vec, int& offset);
 template void MultiheadAttentionLayerWeight::load_params<__half>(
-    const std::vector<const __half*>& para_vec, int &offset);
+    const std::vector<const __half*>& para_vec, int& offset);
 
 template <typename T1, typename T2>
 MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
-    int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
-    int num_heads, float attn_prob_dropout_ratio,
-    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
-    bool mask_future_tokens, MultiheadAttentionLayerWeightPtr _attn_wt)
+    MultiheadAttentionLayerWeightPtr _attn_wt, int layer_id,
+    int max_batch_tokens, int max_seq_len, int hidden_size, int num_heads,
+    float attn_prob_dropout_ratio, float hidden_output_dropout_ratio,
+    bool pre_or_postLayerNorm, bool mask_future_tokens, bool is_post_ln)
     : Layer("MultiheadAttentionLayer"),
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
@@ -72,9 +72,10 @@ MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
       _heads(num_heads),
       _training(true),
       _pre_or_postLayerNorm(pre_or_postLayerNorm),
+      _is_post_ln(is_post_ln),
       // operators
       _attn_ln(
-          new NormalizeLayerOp<T1, T2>(max_batch_tokens, hidden_size, false)),
+          new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false)),
       _qkv_linear(new FeedForwardOp<T1, T2>(max_batch_tokens, 3 * hidden_size,
                                             hidden_size)),
       _bias_add_transform_20314(new BiasAddTrans20314<T1, T2>(
@@ -124,9 +125,10 @@ template <typename T1, typename T2>
 Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
                                                       Variable* inp_mask) {
   Variable* qkv_out = nullptr;
+  Variable* attn_ln_out = nullptr;
   this->set_inputs({inp, inp_mask});
   if (_pre_or_postLayerNorm) {
-    Variable* attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
+    attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
   } else {
     qkv_out = (*_qkv_linear)(inp, _attn_qkvw);
@@ -150,15 +152,22 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
-  Variable* attn_dropout = (*_attn_dropout)(attn_linear, _attn_ob, inp);
+  Variable* attn_dropout_residual;
+  if (_pre_or_postLayerNorm && _is_post_ln) {
+    attn_dropout_residual =
+        (*_attn_dropout)(attn_linear, _attn_ob, attn_ln_out);
+  } else {
+    attn_dropout_residual = (*_attn_dropout)(attn_linear, _attn_ob, inp);
+  }
 
   if (!_pre_or_postLayerNorm) {
-    Variable* attn_ln_out = (*_attn_ln)(attn_dropout, _attn_nw, _attn_nb);
+    Variable* attn_ln_out =
+        (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
     this->set_outputs({attn_ln_out});
     return attn_ln_out;
   } else {
-    this->set_outputs({attn_dropout});
-    return attn_dropout;
+    this->set_outputs({attn_dropout_residual});
+    return attn_dropout_residual;
   }
 }
 
@@ -194,8 +203,5 @@ void MultiheadAttentionLayer<T1, T2>::before_forward(int batch_size,
 
 template <typename T1, typename T2>
 void MultiheadAttentionLayer<T1, T2>::before_backward() {}
-
-// template class MultiheadAttentionLayer<float, float>;
-// template class MultiheadAttentionLayer<__half, __half>;
 
 }  // namespace lightseq

@@ -20,7 +20,7 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
       _pre_or_postLayerNorm(pre_or_postLayerNorm),
       _activation_fn(activation_fn),
       // >>> decoder self attn layer
-      _attn_ln(typename Normalize_Layer<T>::Config(hidden_size, false),
+      _attn_ln(typename Layer_Normalize<T>::Config(hidden_size, false),
                _max_batch_tokens),
       _qkv_linear(
           typename FeedForward<T>::Config(3 * hidden_size, hidden_size)),
@@ -37,7 +37,7 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
       _attn_dropout(typename Dropout<T>::Config(hidden_output_dropout_ratio),
                     _max_batch_tokens * _hidden_size),
       // >>> decoder enc-dec attn layer
-      _encdec_attn_ln(typename Normalize_Layer<T>::Config(hidden_size, false),
+      _encdec_attn_ln(typename Layer_Normalize<T>::Config(hidden_size, false),
                       _max_batch_tokens),
       _encdec_q_linear(
           typename FeedForward<T>::Config(hidden_size, hidden_size)),
@@ -58,7 +58,7 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           typename Dropout<T>::Config(hidden_output_dropout_ratio),
           _max_batch_tokens * _hidden_size),
       // >>> decoder ffn layer
-      _ffn_ln(typename Normalize_Layer<T>::Config(hidden_size, false),
+      _ffn_ln(typename Layer_Normalize<T>::Config(hidden_size, false),
               _max_batch_tokens),
       _ff1(typename FeedForward<T>::Config(_intermediate_size, hidden_size)),
       _ffn_activation_dropout(

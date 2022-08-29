@@ -120,7 +120,7 @@ void BertEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
                             _tw._padding_id, batch_size, batch_seq_len,
                             _tw._hidden_size, _stream, _p_d_src_emb_wei[4],
                             _p_d_lang_id, _tw._multilg_type);
-  
+
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
   print_vec(_p_d_output, "launch encoder embedding", 10);
   printf("\n");
@@ -141,13 +141,17 @@ void BertEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
     ffn_add_norm();
     std::string nm = "layer_" + std::to_string(_layer_id) + "_output";
     print_vec(_p_d_output, nm, 5);
-    exit(0);
+    // exit(0);
   }
 
   // last layer norm
   ker_norm_layer_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
       _p_d_src_emb_wei[2], _p_d_src_emb_wei[3], _max_thread_per_block);
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(_p_d_output, "bert encoder out", 10);
+  printf("\n");
 
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
@@ -168,6 +172,11 @@ Encoder self attention
 template <OperationType OpType_>
 void BertEncoder<OpType_>::self_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(_p_d_output, "attn input", 10);
+  printf("\n");
+
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_q,
       _p_d_enc_wei[_weight_offset], _p_d_enc_wei[_weight_offset + 1],
@@ -192,8 +201,10 @@ void BertEncoder<OpType_>::self_attention() {
    * gemm--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size * 3, _batch_token_num,
-      _tw._hidden_size, &_fone, _p_d_enc_wei[_weight_offset + 2], _AType,
-      _tw._hidden_size * 3, _p_d_q, _BType, _tw._hidden_size, &_fzero,
+      _tw._hidden_size, &_fone, _p_d_enc_wei[_weight_offset + 2],
+      _AType,  // [hidden_size, 3 * hidden_size] -> [3 * hidden, hidden]
+      _tw._hidden_size * 3, _p_d_q, _BType, _tw._hidden_size,
+      &_fzero,  // [input_size, output_size] -> [output_size, input_size]
       _p_d_qkv_projected, _CType, _tw._hidden_size * 3, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
@@ -228,8 +239,10 @@ void BertEncoder<OpType_>::self_attention() {
       _batch_seq_len, _batch_seq_len * _batch_seq_len,
       _batch_size * _tw._head_num, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-  
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
   print_vec(_p_d_c, "after q * k", 10);
+  printf("\n");
 
   ker_correlation_softmax_encself_launcher<_DataType>(
       _batch_size, _batch_seq_len, _tw._head_num, _stream, _p_d_c,
@@ -256,7 +269,6 @@ void BertEncoder<OpType_>::self_attention() {
       _batch_size * _tw._head_num, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
-
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
   print_vec(_p_d_v, "v", 10);
   print_vec(_p_d_c, "score", 10);
@@ -273,6 +285,10 @@ void BertEncoder<OpType_>::self_attention() {
   print_vec(_p_d_v, "self attn before ffn(head): ", 5);
 #endif
 
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(_p_d_output, "attn residual & bias", 10);
+  print_vec(_p_d_enc_wei[_weight_offset + 5], "feedforward bias", 10);
+
   /* ---step 4. new_q = ori_q + new_q * output_wei--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _batch_token_num,
@@ -280,9 +296,9 @@ void BertEncoder<OpType_>::self_attention() {
       _tw._hidden_size, _p_d_v, _BType, _tw._hidden_size, &_fone, _p_d_output,
       _CType, _tw._hidden_size, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
-
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
   print_vec(_p_d_output, "attn feedforward out", 10);
+  printf("\n");
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_output, "self attn ffn out(head): ", 5);
@@ -304,6 +320,11 @@ void BertEncoder<OpType_>::ffn_add_norm() {
       _p_d_enc_wei[_weight_offset + 11], _max_thread_per_block,
       _tw._is_post_ln);
 
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(_p_d_ffn_buf1, "ffn normalize out", 10);
+  print_vec(_p_d_output, "ffn residual", 10);
+  printf("\n");
+
 #ifdef DEBUG_RESULT
   print_vec(_p_d_enc_wei[_weight_offset + 6], "layer norm scale(head): ", 5);
   print_vec(_p_d_enc_wei[_weight_offset + 7], "layer norm bias(head): ", 5);
@@ -319,6 +340,10 @@ void BertEncoder<OpType_>::ffn_add_norm() {
       _tw._inner_size, _p_d_ffn_buf1, _BType, _tw._hidden_size, &_fzero,
       _p_d_ffn_buf2, _CType, _tw._inner_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(_p_d_ffn_buf2, "ffn ff1 out", 10);
+  printf("\n");
 
   if (_tw._use_gelu) {
     ker_bias_gelu_launcher<_DataType>(
@@ -336,6 +361,9 @@ void BertEncoder<OpType_>::ffn_add_norm() {
             "ffn activation(tail): ", 5);
 #endif
 
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(_p_d_ffn_buf2, "ffn ff2 inp", 10);
+
   /* ---step 2. second ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _batch_token_num,
@@ -343,6 +371,10 @@ void BertEncoder<OpType_>::ffn_add_norm() {
       _tw._hidden_size, _p_d_ffn_buf2, _BType, _tw._inner_size, &_fone,
       _p_d_output, _CType, _tw._hidden_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(_p_d_output, "ffn ff2 out", 10);
+  printf("\n");
 
   return;
 }

@@ -24,9 +24,9 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
           typename FeedForward<T>::Config(3 * hidden_size, hidden_size)),
       _attn_out_linear(
           typename FeedForward<T>::Config(hidden_size, hidden_size)),
-      _attn_ln(typename Normalize_Layer<T>::Config(hidden_size, false),
+      _attn_ln(typename Layer_Normalize<T>::Config(hidden_size, false),
                _max_batch_tokens),
-      _ffn_ln(typename Normalize_Layer<T>::Config(hidden_size, false),
+      _ffn_ln(typename Layer_Normalize<T>::Config(hidden_size, false),
               _max_batch_tokens),
       _ff1(typename FeedForward<T>::Config(_intermediate_size, hidden_size)),
       _ff2(typename FeedForward<T>::Config(hidden_size, _intermediate_size)),

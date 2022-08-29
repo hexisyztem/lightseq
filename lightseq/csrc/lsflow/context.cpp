@@ -32,14 +32,14 @@ void Context::set_thread_context(ContextPtr context_ptr) {
 void Context::remove_thread_context() { thread_context_ptr.reset(); }
 
 void Context::add_op(Operator* op) {
-  if (_layer_context.size()) 
+  if (_layer_context.size())
     _layer_context[0]->_op_vec.push_back(op);
-  else if (op->op_type() == OperatorType::LaunchEmbOp){
+  else if (op->op_type() == OperatorType::LaunchEmbOp) {
     _model_ops.push_back(op);
   }
 #if ONLY_OP == true
   _model_ops.push_back(op);
-#endif 
+#endif
 }
 void Context::add_node(Node* node) { _all_node_vec.push_back(node); }
 

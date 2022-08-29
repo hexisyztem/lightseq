@@ -29,7 +29,7 @@ void TransformerEncoderLayerWeight::load_params(
 
   _ffn_layer_wt->load_params(para_vec, offset);
 
-  return ;
+  return;
 }
 
 template void TransformerEncoderLayerWeight::load_params<float>(
@@ -39,21 +39,24 @@ template void TransformerEncoderLayerWeight::load_params<__half>(
 
 template <typename T1, typename T2>
 TransformerEncoderLayer<T1, T2>::TransformerEncoderLayer(
-    int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
-    int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
+    TransformerEncoderLayerWeightPtr enc_layer_wt, int layer_id,
+    int max_batch_tokens, int max_seq_len, int hidden_size, int num_heads,
+    int intermediate_size, float attn_prob_dropout_ratio,
     float activation_dropout_ratio, float hidden_output_dropout_ratio,
     bool pre_or_postLayerNorm, std::string activation_fn,
-    bool mask_future_tokens, TransformerEncoderLayerWeightPtr enc_layer_wt)
+    bool mask_future_tokens, bool is_post_ln)
     : Layer("TransformerEncoderLayer") {
   _attn_layer.reset(new MultiheadAttentionLayer<T1, T2>(
-      layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
-      attn_prob_dropout_ratio, hidden_output_dropout_ratio,
-      pre_or_postLayerNorm, mask_future_tokens, enc_layer_wt->_attn_layer_wt));
+      enc_layer_wt->_attn_layer_wt, layer_id, max_batch_tokens, max_seq_len,
+      hidden_size, num_heads, attn_prob_dropout_ratio,
+      hidden_output_dropout_ratio, pre_or_postLayerNorm, mask_future_tokens,
+      is_post_ln));
 
   _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
-      layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
-      intermediate_size, activation_dropout_ratio, hidden_output_dropout_ratio,
-      pre_or_postLayerNorm, activation_fn, enc_layer_wt->_ffn_layer_wt));
+      enc_layer_wt->_ffn_layer_wt, layer_id, max_batch_tokens, max_seq_len,
+      hidden_size, num_heads, intermediate_size, activation_dropout_ratio,
+      hidden_output_dropout_ratio, pre_or_postLayerNorm, activation_fn,
+      is_post_ln));
 
   this->_context_ptr->exit_layer();  // necessary
 }

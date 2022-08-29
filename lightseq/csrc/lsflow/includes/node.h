@@ -81,9 +81,10 @@ enum class OperatorType {
 };
 
 class Operator : public Node {
-protected:
+ protected:
   OperatorType _op_type;
-public:
+
+ public:
   Operator(std::string name, OperatorType op_type = OperatorType::NormalOp);
   virtual ~Operator() {}
   void check_override_grad();

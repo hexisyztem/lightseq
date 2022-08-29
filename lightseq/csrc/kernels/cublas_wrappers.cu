@@ -14,7 +14,8 @@ int cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transa,
                    (const void *)B, CUDA_R_32F, (transb == CUBLAS_OP_N) ? k : n,
                    (const void *)beta, C, CUDA_R_32F, m, CUDA_R_32F, algo);
 
-  // std::cout << transa << " " << transb << " " << m << " " << n << " " << k << std::endl;
+  // std::cout << transa << " " << transb << " " << m << " " << n << " " << k <<
+  // std::endl;
 
   if (status != CUBLAS_STATUS_SUCCESS) {
     fprintf(stderr,

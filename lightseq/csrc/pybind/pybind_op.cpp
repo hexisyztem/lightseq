@@ -4,7 +4,7 @@
 
 #include "declaration.h"
 #include "context.h"
-#include "normalize_layer.h"
+#include "layer_normalize.h"
 #include "feed_forward.h"
 
 // x is torch::Tensor
@@ -32,8 +32,8 @@ void layer_normalize_fw(const torch::Tensor& ln_res, const torch::Tensor& inp,
   Variable* gamma_var = new Variable("gamma", (char*)gamma_ptr);
   Variable* betta_var = new Variable("betta", (char*)betta_ptr);
 
-  NormalizeLayerOp<T1, T2>* op =
-      new NormalizeLayerOp<T1, T2>(batch_tokens, hidden_dim);
+  LayerNormalizeOp<T1, T2>* op =
+      new LayerNormalizeOp<T1, T2>(batch_tokens, hidden_dim);
 
   Variable* out = (*op)(inp_var, gamma_var, betta_var);
 
@@ -77,8 +77,8 @@ void layer_normalize_bw(const torch::Tensor& ln_res,
   Variable* betta_var =
       new Variable("betta", (char*)betta_ptr, (char*)betta_grad_ptr);
 
-  NormalizeLayerOp<T1, T2>* op =
-      new NormalizeLayerOp<T1, T2>(batch_tokens, hidden_dim);
+  LayerNormalizeOp<T1, T2>* op =
+      new LayerNormalizeOp<T1, T2>(batch_tokens, hidden_dim);
 
   Variable* out = (*op)(inp_var, gamma_var, betta_var);
 

@@ -10,7 +10,7 @@
 #include "cuda_util.h"
 #include "dropout.h"
 #include "feed_forward.h"
-#include "normalize_layer.h"
+#include "layer_normalize.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
 
@@ -189,8 +189,8 @@ class TransformerEncoderLayer {
   // layers
   FeedForward<T> _qkv_linear;
   FeedForward<T> _attn_out_linear;
-  Normalize_Layer<T> _attn_ln;
-  Normalize_Layer<T> _ffn_ln;
+  Layer_Normalize<T> _attn_ln;
+  Layer_Normalize<T> _ffn_ln;
   FeedForward<T> _ff1, _ff2;
   Softmax<T> _softmax;
   Dropout<T> _attn_prob_dropout;

@@ -63,7 +63,7 @@ template void check_gpu_error<cublasStatus_t>(cublasStatus_t result,
                                               int const line);
 
 template <typename T>
-void print_vec(const T* outv, std::string outn, int num_output_ele) {
+void print_vec(const T *outv, std::string outn, int num_output_ele) {
   std::cout << outn << ": ";
   std::vector<T> hout(num_output_ele, (T)0);
   CHECK_GPU_ERROR(cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(T),
@@ -75,7 +75,7 @@ void print_vec(const T* outv, std::string outn, int num_output_ele) {
 }
 
 template <>
-void print_vec<__half>(const __half* outv, std::string outn,
+void print_vec<__half>(const __half *outv, std::string outn,
                        int num_output_ele) {
   std::cout << outn << ": ";
   std::vector<__half> hout(num_output_ele, (__half)0.f);
@@ -88,7 +88,7 @@ void print_vec<__half>(const __half* outv, std::string outn,
 }
 
 template <>
-void print_vec<int8_t>(const int8_t* outv, std::string outn,
+void print_vec<int8_t>(const int8_t *outv, std::string outn,
                        int num_output_ele) {
   std::cout << outn << ": ";
   std::vector<int8_t> hout(num_output_ele, (int8_t)0);
@@ -100,20 +100,20 @@ void print_vec<int8_t>(const int8_t* outv, std::string outn,
   std::cout << std::endl;
 }
 
-template void print_vec<float>(const float* outv, std::string outn,
+template void print_vec<float>(const float *outv, std::string outn,
                                int num_output_ele);
 
-template void print_vec<int>(const int* outv, std::string outn,
+template void print_vec<int>(const int *outv, std::string outn,
                              int num_output_ele);
 
-template void print_vec<int8_t>(const int8_t* outv, std::string outn,
+template void print_vec<int8_t>(const int8_t *outv, std::string outn,
                                 int num_output_ele);
 
-template void print_vec<__half>(const __half* outv, std::string outn,
+template void print_vec<__half>(const __half *outv, std::string outn,
                                 int num_output_ele);
 
 template <typename T>
-void print_vec(const T* outv, std::string outn, int start, int end) {
+void print_vec(const T *outv, std::string outn, int start, int end) {
   std::cout << outn << ": ";
   thrust::copy(thrust::device_pointer_cast(outv + start),
                thrust::device_pointer_cast(outv + end),
@@ -122,7 +122,7 @@ void print_vec(const T* outv, std::string outn, int start, int end) {
 }
 
 template <>
-void print_vec<__half>(const __half* outv, std::string outn, int start,
+void print_vec<__half>(const __half *outv, std::string outn, int start,
                        int end) {
   std::cout << outn << ": ";
   int num_elements = end - start;
@@ -136,10 +136,10 @@ void print_vec<__half>(const __half* outv, std::string outn, int start,
   std::cout << std::endl;
 }
 
-template void print_vec<float>(const float* outv, std::string outn, int start,
+template void print_vec<float>(const float *outv, std::string outn, int start,
                                int end);
 
-template void print_vec<int>(const int* outv, std::string outn, int start,
+template void print_vec<int>(const int *outv, std::string outn, int start,
                              int end);
 
 template <typename T>

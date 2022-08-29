@@ -26,9 +26,9 @@ void FeedForwardOp<T1, T2>::forward() {
                  _batch_tokens, _input_size, &alpha, &beta, weights, input_ptr,
                  out_ptr, cublasGemmAlgo_t(_gemm_algos[0]));
 
-  
-  if(_context_ptr->built()) {
+  if (_context_ptr->built()) {
     cudaStreamSynchronize(_context_ptr->get_stream());
+    print_vec(input_ptr, this->name() + " inp", 10);
     print_vec(out_ptr, this->name() + " ans", 10);
     printf("\n");
     // exit(-1);

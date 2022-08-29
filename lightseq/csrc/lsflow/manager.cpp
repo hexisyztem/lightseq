@@ -87,7 +87,6 @@ void MemoryManager::calculate_buffer_() {
   }
 
   printf("total_consumption: %zu\n", total_consumption);
-  
 
   // Add algorithm check module
   // return true means check success,
@@ -110,11 +109,11 @@ void MemoryManager::calculate_buffer_() {
   for (auto iter : tensor_usages_vec) {
     int unique_id = iter.first.unique_id;
     size_t size = iter.first.size;
-// #if DEBUG == true
+    // #if DEBUG == true
     printf("idx: %d, life cycle : [%d, %d], name: %s, size: %zu, offset: %zu\n",
            unique_id, iter.first.first_idx, iter.first.last_idx,
            iter.first._name.c_str(), size, iter.second);
-// #endif
+    // #endif
 
     for (auto check_iter : temp_check_vec) {
       if (judge_func(check_iter, iter)) {
@@ -148,7 +147,6 @@ void MemoryManager::calculate_buffer_() {
     int unique_id = iter.first.unique_id;
     tensor_ptr.emplace(unique_id, buffer_ + iter.second);
   }
-
 }
 
 }  // namespace lightseq

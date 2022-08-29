@@ -33,7 +33,7 @@ void Node::recursive_forward() {
   _fw_flag = true;
   // auto real_context_ptr = _context_ptr.lock();
   _context_ptr->update_node_idx();
-  
+
   // printf("calculate forward: %s\n", _name.c_str());
 
   forward();
@@ -123,8 +123,8 @@ bool Variable::enable_override_grad() {
   }
 }
 
-Operator::Operator(std::string name, OperatorType op_type): 
-  Node(name), _op_type(op_type) {
+Operator::Operator(std::string name, OperatorType op_type)
+    : Node(name), _op_type(op_type) {
   _context_ptr->add_op(this);
 }
 

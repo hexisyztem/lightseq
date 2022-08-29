@@ -10,7 +10,7 @@
 #include "cuda_util.h"
 #include "dropout.h"
 #include "feed_forward.h"
-#include "normalize_layer.h"
+#include "layer_normalize.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
 
@@ -306,7 +306,7 @@ class TransformerDecoderLayer {
   cudaStream_t _stream;
 
   // layers
-  Normalize_Layer<T> _attn_ln, _encdec_attn_ln, _ffn_ln;
+  Layer_Normalize<T> _attn_ln, _encdec_attn_ln, _ffn_ln;
   FeedForward<T> _qkv_linear, _attn_out_linear, _encdec_q_linear,
       _encdec_kv_linear, _encdec_attn_out_linear, _ff1, _ff2;
   Softmax<T> _softmax, _encdec_softmax;

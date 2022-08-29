@@ -32,7 +32,7 @@ void BiasAddTrans20314<T1, T2>::forward() {
                                           bias_ptr, _batch, _seq_len, 3, _heads,
                                           _hidden_size / _heads, _stream);
 
-  if(_context_ptr->built()) {
+  if (_context_ptr->built()) {
     cudaStreamSynchronize(_stream);
     print_vec(q_ptr, "after_transform q", 10);
     print_vec(k_ptr, "after_transform k", 10);

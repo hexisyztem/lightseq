@@ -4,7 +4,7 @@
 #include "bias_dropout_residual.h"
 #include "dropout.h"
 #include "feed_forward.h"
-#include "normalize_layer.h"
+#include "layer_normalize.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
 #include "transform_0213.h"
@@ -36,7 +36,7 @@ class MultiheadAttentionLayerWeight {
   int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 
   template <typename T>
-  void load_params(const std::vector<const T*>& para_vec, int &offset);
+  void load_params(const std::vector<const T*>& para_vec, int& offset);
 };
 
 using MultiheadAttentionLayerWeightPtr =
@@ -46,7 +46,7 @@ template <class T1, class T2>
 class MultiheadAttentionLayer : public Layer {
  private:
   // operators
-  NormalizeLayerOp<T1, T2>* _attn_ln = nullptr;
+  LayerNormalizeOp<T1, T2>* _attn_ln = nullptr;
   FeedForwardOp<T1, T2>* _qkv_linear = nullptr;
   BiasAddTrans20314<T1, T2>* _bias_add_transform_20314 = nullptr;
   StridedBatchGemmOp<T1, T2>* _attn_scores = nullptr;
@@ -76,14 +76,16 @@ class MultiheadAttentionLayer : public Layer {
   int _heads;
   int _training;
   bool _pre_or_postLayerNorm;
+  bool _is_post_ln;
 
  public:
-  MultiheadAttentionLayer(int layer_id, int max_batch_tokens, int max_seq_len,
+  MultiheadAttentionLayer(MultiheadAttentionLayerWeightPtr _attn_wt,
+                          int layer_id, int max_batch_tokens, int max_seq_len,
                           int hidden_size, int num_heads,
                           float attn_prob_dropout_ratio,
                           float hidden_output_dropout_ratio,
                           bool pre_or_postLayerNorm, bool mask_future_tokens,
-                          MultiheadAttentionLayerWeightPtr _attn_wt);
+                          bool is_post_ln = false);
 
   virtual ~MultiheadAttentionLayer() {}
 

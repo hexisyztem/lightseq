@@ -100,8 +100,9 @@ std::string BertWeight<T>::proto_parse_enc_wei(const Bert &bert) {
   std::vector<float> value;
   int idx = 0;
 
-  int max_size = std::max(_hidden_size * _hidden_size * 3, _hidden_size * _inner_size);
-  float* temp_buffer = (float*)malloc(max_size);
+  int max_size =
+      std::max(_hidden_size * _hidden_size * 3, _hidden_size * _inner_size);
+  float *temp_buffer = (float *)malloc(max_size);
 
   for (auto enc_layer : bert.encoder_stack()) {
     offset.push_back(idx);
@@ -315,7 +316,8 @@ void BertWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   std::cout << "loading " << value_size * sizeof(T) / (1024 * 1024)
             << " MB of encoder weight." << std::endl;
 
-  int max_size = std::max(3 * _hidden_size * _hidden_size, _hidden_size * _inner_size);
+  int max_size =
+      std::max(3 * _hidden_size * _hidden_size, _hidden_size * _inner_size);
   std::vector<float> temp_buffer(max_size);
 
   int idx = 0;
@@ -342,7 +344,8 @@ void BertWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         H5T_NATIVE_FLOAT, value.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size * 3; },
         "Wrong multihead_project_kernel_qkv_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size, 3 * _hidden_size);
+    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
+                          3 * _hidden_size);
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
@@ -359,7 +362,8 @@ void BertWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         H5T_NATIVE_FLOAT, value.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size; },
         "Wrong multihead_project_kernel_output_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size, _hidden_size);
+    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
+                          _hidden_size);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -390,7 +394,8 @@ void BertWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         value.data() + idx,
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong ffn_first_kernel_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size, _inner_size);
+    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
+                          _inner_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -406,7 +411,8 @@ void BertWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         value.data() + idx,
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong ffn_second_kernel_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _inner_size, _hidden_size);
+    transform_param_shape(value.data() + idx, temp_buffer.data(), _inner_size,
+                          _hidden_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -415,16 +421,7 @@ void BertWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         value.data() + idx, [=](int size) { return size != _hidden_size; },
         "Wrong ffn_second_bias_size !");
     idx += _hidden_size;
-
-  }  // for
-
-  // int offset_idx = 0;
-  // for (int layer_id = 0; layer_id < _n_enc_layer; layer_id ++) {
-  //   transform_param_shape(value.data() + offset[offset_idx + 2], temp_buffer, 3 * _hidden_size, _hidden_size);
-
-  //   offset_idx += 12;
-  // }
-
+  }
 
   std::vector<T> raw_value;
   raw_value.reserve(value.size());

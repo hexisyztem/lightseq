@@ -11,7 +11,7 @@
 using namespace std;
 
 template <typename T>
-class Normalize_Layer {
+class Layer_Normalize {
  public:
   struct Config {
     uint32_t hidden_dim;
@@ -20,9 +20,9 @@ class Normalize_Layer {
         : hidden_dim(hidden_dim), use_mean(use_mean) {}
   };
 
-  Normalize_Layer(Config config, size_t max_rows);
+  Layer_Normalize(Config config, size_t max_rows);
 
-  ~Normalize_Layer();
+  ~Layer_Normalize();
 
   void Forward(T *ln_res, const T *inp, const T *gamma, const T *betta,
                int batch_size, cudaStream_t stream);

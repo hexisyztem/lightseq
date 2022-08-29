@@ -4,6 +4,7 @@
 #include "layer.h"
 #include "transformer_encoder_layer.h"
 #include "launch_enc_emb.h"
+#include "lyr_normalize_layer.h"
 
 #ifdef FP16_MODE
 typedef __half OpType_;
@@ -14,20 +15,21 @@ typedef float OpType_;
 namespace lightseq {
 namespace cuda {
 
-class Bert: public LSModel {
-private:
+class Bert : public LSModel {
+ private:
   BertWeight<OpType_> tw_;
 
   LaunchEncEmbOp<OpType_>* launch_enc_emb_op;
   std::vector<TransformerEncoderLayerPtr<OpType_, OpType_> > enc_layer_vec;
   std::vector<TransformerEncoderLayerWeightPtr> enc_layer_wts;
+  LyrNormalizeLayerPtr<OpType_, OpType_> lyr_norm_layer;
 
   ContextPtr context_ptr;
 
-  Variable* inp_tokens; // need to allocate
+  Variable* inp_tokens;  // need to allocate
   Variable* token_emb;
   Variable* pos_emb;
-  Variable* pad_mask;   // need to allocate
+  Variable* pad_mask;  // need to allocate
   Variable* lang_emb;
   Variable* lang_id;
 
@@ -37,15 +39,15 @@ private:
 
   int* pad_mask_ptr;
 
-public:
+ public:
   Bert(const std::string weight_path, const int max_batch_size);
 
   ~Bert();
 
   void Infer() override;
-  void set_input_ptr(int index, void *input_ptr) override;
-  void set_output_ptr(int index, void *output_ptr) override;
-  const void *get_output_ptr(int index) override;
+  void set_input_ptr(int index, void* input_ptr) override;
+  void set_output_ptr(int index, void* output_ptr) override;
+  const void* get_output_ptr(int index) override;
   std::vector<int> get_input_max_shape(int index) override;
   std::vector<int> get_output_max_shape(int index) override;
   DataType get_input_dtype(int index) override;
@@ -54,5 +56,5 @@ public:
 
 LSMODEL_REGISTER(Bert);
 
-} // namespace cuda
+}  // namespace cuda
 }  // namespace lightseq

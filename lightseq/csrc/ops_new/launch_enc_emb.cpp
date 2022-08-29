@@ -30,13 +30,11 @@ void LaunchEncEmbOp<T>::forward() {
 
   T* output_ptr = (T*)child(0)->value();
 
-
   cuda::launch_enc_emb<T>(token_emb, pos_emb, inp_tokens, output_ptr, pad_mask,
-                    _pad_id, _batch_size, _seq_len, _hidden_dim, _stream,
-                    lang_emb, lang_id, _multilg_type); 
+                          _pad_id, _batch_size, _seq_len, _hidden_dim, _stream,
+                          lang_emb, lang_id, _multilg_type);
 
-
-  if(_context_ptr->built()) {
+  if (_context_ptr->built()) {
     cudaStreamSynchronize(_context_ptr->get_stream());
     print_vec(output_ptr, this->name() + " ans", 10);
     printf("\n");

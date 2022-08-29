@@ -5,7 +5,7 @@ set(operator_files
     dropout.cpp
     feed_forward.cpp
     launch_enc_emb.cpp
-    normalize_layer.cpp
+    layer_normalize.cpp
     softmax.cpp
     strided_batch_gemm.cpp
     transform_0213.cpp)
