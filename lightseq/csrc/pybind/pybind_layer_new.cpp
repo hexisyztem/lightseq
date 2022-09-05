@@ -45,7 +45,7 @@ int create_transformer_encoder_layer_new(
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
     float activation_dropout_ratio, float hidden_dropout_ratio,
     bool pre_or_postLayerNorm, std::string activation_fn,
-    bool mask_future_tokens, torch::Tensor &para_ptr, torch::Tensor &grad_ptr) {
+    bool mask_future_tokens) {
   // necessary
   ContextInitial();
 
@@ -54,8 +54,6 @@ int create_transformer_encoder_layer_new(
       intermediate_size, attn_prob_dropout_ratio, activation_dropout_ratio,
       hidden_dropout_ratio, pre_or_postLayerNorm, activation_fn,
       mask_future_tokens);
-
-  layer->load_para_and_grad(rptr<T1>(para_ptr), rptr<T2>(grad_ptr));
 
   Variable *inp(new Variable("transformer_encoder_layer_" +
                              std::to_string(layer_id) + "_inp"));
@@ -70,7 +68,6 @@ int create_transformer_encoder_layer_new(
   const int default_batch_size = 1;
   const int default_seq_len = 64;
   layer->before_forward(default_batch_size, default_seq_len);
-  thread_context_ptr->build();
 
   std::string T1_dtype = (std::is_same<T1, __half>::value) ? "half" : "float";
   std::string T2_dtype = (std::is_same<T2, __half>::value) ? "half" : "float";
@@ -86,8 +83,6 @@ std::vector<torch::Tensor> transformer_encoder_layer_fw(int layer_id,
                                   const torch::Tensor &input,
                                   const torch::Tensor &input_mask,
                                   bool training_mode) {
-  
-  auto start = std::chrono::high_resolution_clock::now();
 
   CHECK_INPUT(input);
   CHECK_INPUT(input_mask);
@@ -115,8 +110,6 @@ std::vector<torch::Tensor> transformer_encoder_layer_fw(int layer_id,
 
   layer->forward();
 
-  print_time_duration(start, "one forward duration", layer->_context_ptr->get_stream());
-
   return {output};
 }
 
@@ -127,7 +120,6 @@ std::vector<torch::Tensor> transformer_encoder_layer_bw(
     const torch::Tensor &output, const torch::Tensor &input,
     const torch::Tensor &input_mask) {
   
-  auto start = std::chrono::high_resolution_clock::now();
 
   CHECK_INPUT(grad_out);
   CHECK_INPUT(output);
@@ -162,8 +154,34 @@ std::vector<torch::Tensor> transformer_encoder_layer_bw(
 
   layer->backward();
 
-  print_time_duration(start, "one backward duration", layer->_context_ptr->get_stream());
   return {grad_inp};
+}
+
+
+template <typename T1, typename T2>
+void assign_layer_weight_grad(const torch::Tensor &weights,
+                              torch::Tensor &grads, std::string layer_name,
+                              int layer_id) {
+  CHECK_INPUT(weights);
+  const T1 *wptr = (const T1 *)weights.data_ptr();
+
+  CHECK_INPUT(grads);
+  T2 *gptr = (T2 *)grads.data_ptr();
+
+  if (layer_name == "TransformerEncoderLayer") {
+    std::shared_ptr<TransformerEncoderLayer<T1, T2>> layer =
+        std::static_pointer_cast<TransformerEncoderLayer<T1, T2>>(
+            s_transformer_encoder_layers[layer_id]);
+    layer->load_para_and_grad(wptr, gptr);
+    printf("Running assign_layer_weight_grad\n");
+  } 
+  else {
+    printf("Error! assign_layer_weight_grad with NULL!");
+    exit(-1);
+  }
+  std::cout << layer_name << " #" << layer_id << " bind weights and grads."
+            << std::endl;
+  return;
 }
 
 }  // namespace lightseq
@@ -189,4 +207,11 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("transformer_encoder_layer_bw_fp16",
         &lightseq::transformer_encoder_layer_bw<__half, __half>,
         "LightSeq Transformer Encoder forward with fp16 (CUDA)");
+        
+  m.def("assign_layer_weight_grad_fp32", 
+        &lightseq::assign_layer_weight_grad<float, float>,
+        "Bind layer weights and grads");
+  m.def("assign_layer_weight_grad_fp16", 
+        &lightseq::assign_layer_weight_grad<__half, __half>,
+        "Bind layer weights and grads");
 }

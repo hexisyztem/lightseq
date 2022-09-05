@@ -123,7 +123,7 @@ def test_encoder_layer_forward():
 
     return custom, baseline
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=1, nrepeat=2)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
 def test_encoder_layer_backward():
     batch_size, seq_len = kt.bs_sl() 
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")

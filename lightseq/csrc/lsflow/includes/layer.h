@@ -43,6 +43,7 @@ class Layer {
 
   bool macro_inputs_check = false;
   bool macro_outputs_check = false;
+
 };
 
 #define LAYER_PRE_INPUTS(...)                                        \

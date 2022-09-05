@@ -88,6 +88,7 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
         super(LSTransformerEncoderLayerNew, self).__init__()
 
         self.config = config
+        self.is_assigned_para_grad = False
         self.config.layer_id = LSTransformerEncoderLayerNew.layer_id
         LSTransformerEncoderLayerNew.layer_id = (
             LSTransformerEncoderLayerNew.layer_id + 1
@@ -98,57 +99,39 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
         if self.config.local_rank is not None and self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
 
+        self.create_cpp_layer()
+
         hs = self.config.hidden_size
         ims = self.config.intermediate_size
         self.hs = hs
         self.ims = ims
         self.para_offset = LSTransformerEncoderLayerNew.gen_offset(hs, ims)
-        self.para = nn.Parameter(torch.Tensor(self.para_offset[-1])).to("cuda:0")
+        self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
 
         if initial_weights is None or initial_biases is None:
             self.init_transformer_weights()
-        else:
-            # For testing only.
-            qkv_w = [ele.detach().clone() for ele in initial_weights[:3]]
-            qkv_w = torch.cat(qkv_w, dim=0)
-            weights = [qkv_w] + [copy_para(ele) for ele in initial_weights[3:]]
+            return
 
-            qkv_b = [ele.detach().clone() for ele in initial_biases[:3]]
-            qkv_b = torch.cat(qkv_b, dim=0)
-            biases = [qkv_b] + [copy_para(ele) for ele in initial_biases[3:]]
+        # For testing only.
+        qkv_w = [ele.detach().clone() for ele in initial_weights[:3]]
+        qkv_w = torch.cat(qkv_w, dim=0)
+        weights = [qkv_w] + [copy_para(ele) for ele in initial_weights[3:]]
 
-            idx = 0
-            for w, b in zip(weights, biases):
-                cur_para = self._get_weights(idx)
-                assert cur_para.numel() == w.numel()
-                cur_para.copy_(w.view(-1))
-                idx += 1
+        qkv_b = [ele.detach().clone() for ele in initial_biases[:3]]
+        qkv_b = torch.cat(qkv_b, dim=0)
+        biases = [qkv_b] + [copy_para(ele) for ele in initial_biases[3:]]
 
-                cur_para = self._get_weights(idx)
-                assert cur_para.numel() == b.numel()
-                cur_para.copy_(b.view(-1))
-                idx += 1
+        idx = 0
+        for w, b in zip(weights, biases):
+            cur_para = self._get_weights(idx)
+            assert cur_para.numel() == w.numel()
+            cur_para.copy_(w.view(-1))
+            idx += 1
 
-        if self.config.fp16 and self.para.dtype != torch.half:
-            if hasattr(self, "para_16"):
-                self.para_16.copy_(self.para.to(torch.half))
-            else:
-                self.register_buffer("para_16", self.para.clone().detach().half())
-
-        param = (
-            self.para_16
-            if self.config.fp16 and self.para.dtype != torch.half
-            else self.para
-        )
- 
-        param.to("cuda:0") # TODO: need to adapt multi device
-
-        grad = torch.zeros_like(param)
-
-        _all_layer_grads[self.config.layer_id] = grad
-        self.layer_grad = grad
-
-        self.create_cpp_layer(param, grad)
+            cur_para = self._get_weights(idx)
+            assert cur_para.numel() == b.numel()
+            cur_para.copy_(b.view(-1))
+            idx += 1
 
     @staticmethod
     def gen_offset(hidden_size, intermediate_size):
@@ -170,7 +153,7 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
         offsets = calc_offset(sizes)
         return offsets
 
-    def create_cpp_layer(self, param, grad):
+    def create_cpp_layer(self):
 
         # create the layer in cuda kernels.
         cuda_module = layer_cuda_module
@@ -193,8 +176,6 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
             self.config.pre_layer_norm,
             self.config.activation_fn,
             False,  # mask_future_tokens
-            param,
-            grad,
         )
 
     def _get_weights(self, i):
@@ -277,6 +258,27 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
         }
         return weight, bias
 
+    def __assign_layer_weight_grad(self):
+        if self.is_assigned_para_grad == True:
+            return 
+        self.is_assigned_para_grad = True
+        param = (
+            self.para_16
+            if self.config.fp16 and self.para.dtype != torch.half
+            else self.para
+        )
+        if self.config.layer_id in _all_layer_grads:
+            return
+        global layer_cuda_module
+        cuda_module = layer_cuda_module
+        if self.config.fp16:
+            func = cuda_module.assign_layer_weight_grad_fp16
+        else:
+            func = cuda_module.assign_layer_weight_grad_fp32
+        grad = torch.empty_like(param)
+        func(param, grad, "TransformerEncoderLayer", self.config.layer_id)
+        _all_layer_grads[self.config.layer_id] = grad
+
     def state_dict(self, destination=None, prefix="", keep_vars=False):
         destination = state_dict(
             self, destination=destination, prefix=prefix, keep_vars=keep_vars
@@ -294,7 +296,13 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
         encoder_padding_mask = (
             (encoder_padding_mask * -1e8).type_as(hidden_states).contiguous()
         )
+        if self.config.fp16 and self.para.dtype != torch.half:
+            if hasattr(self, "para_16"):
+                self.para_16.copy_(self.para.to(torch.half))
+            else:
+                self.register_buffer("para_16", self.para.clone().detach().half())
 
+        self.__assign_layer_weight_grad()
         bs, sl, dim = hidden_states.size()
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
@@ -318,4 +326,4 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
             self.config,
         )
 
-        return output
+        return output.to(self.para)
