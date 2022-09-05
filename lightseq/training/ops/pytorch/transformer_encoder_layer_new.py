@@ -21,7 +21,6 @@ class LSTransformerEncoderFuncNew(Function):
     @staticmethod
     def forward(
         ctx,
-        res,
         input,
         input_mask,
         parameters,
@@ -36,14 +35,13 @@ class LSTransformerEncoderFuncNew(Function):
         if config.fp16:
             input = input.to(torch.half)
             input_mask = input_mask.to(torch.half)
-            res = res.to(torch.half)
 
-        forward_func(config.layer_id, res, input, input_mask, config.training)
+        (output, ) = forward_func(config.layer_id, input, input_mask, config.training)
 
         if config.is_grad_enabled and config.training:
-            ctx.save_for_backward(res, input, input_mask)
+            ctx.save_for_backward(output, input, input_mask)
             ctx.config = config
-        return res
+        return output
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -69,7 +67,6 @@ class LSTransformerEncoderFuncNew(Function):
         grad = _all_layer_grads[ctx.config.layer_id]
 
         return (grad_input, None, grad, None)
-
 
 class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
     """Initialize the Lightseq Transformer Encoder Layer.
@@ -143,12 +140,13 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
             if self.config.fp16 and self.para.dtype != torch.half
             else self.para
         )
+ 
+        param.to("cuda:0") # TODO: need to adapt multi device
 
-        param.to("cuda:0")
-
-        grad = torch.empty_like(param)
+        grad = torch.zeros_like(param)
 
         _all_layer_grads[self.config.layer_id] = grad
+        self.layer_grad = grad
 
         self.create_cpp_layer(param, grad)
 
@@ -285,7 +283,7 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
         )
         return destination
 
-    def forward(self, res, hidden_states, encoder_padding_mask, **kwargs):
+    def forward(self, hidden_states, encoder_padding_mask, **kwargs):
         # encoder_padding_mask is a mask for the input sequence
         # sizes are [batch_size, seq_len] or [seq_len] when batch_size = 1
         # masked value should be 1.0, unmasked value should be 0.0
@@ -314,11 +312,10 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
                 0
             ) and sl == encoder_padding_mask.size(1)
         output = LSTransformerEncoderFuncNew.apply(
-            res,
             hidden_states,
             encoder_padding_mask,
             self.para,
             self.config,
         )
 
-        return output.to(self.para)
+        return output

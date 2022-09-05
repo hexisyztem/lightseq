@@ -28,13 +28,12 @@ T *rptr(torch::Tensor &tensor) {
 
 static std::unordered_map<int, std::shared_ptr<void>>
     s_transformer_encoder_layers;
-static std::unordered_map<int, std::shared_ptr<void>> s_cross_entropy_layers;
 
 void ContextInitial() {
   static ContextPtr context_ptr;
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   if (context_ptr == nullptr) {
-    context_ptr.reset(new Context());
+    context_ptr.reset(new Context(true));
     Context::set_thread_context(context_ptr);
   }
   context_ptr->set_stream(stream);
@@ -67,6 +66,12 @@ int create_transformer_encoder_layer_new(
 
   s_transformer_encoder_layers[layer_id] = layer;
 
+
+  const int default_batch_size = 1;
+  const int default_seq_len = 64;
+  layer->before_forward(default_batch_size, default_seq_len);
+  thread_context_ptr->build();
+
   std::string T1_dtype = (std::is_same<T1, __half>::value) ? "half" : "float";
   std::string T2_dtype = (std::is_same<T2, __half>::value) ? "half" : "float";
 
@@ -77,12 +82,17 @@ int create_transformer_encoder_layer_new(
 }
 
 template <typename T1, typename T2>
-void transformer_encoder_layer_fw(int layer_id, torch::Tensor &output,
+std::vector<torch::Tensor> transformer_encoder_layer_fw(int layer_id,
                                   const torch::Tensor &input,
                                   const torch::Tensor &input_mask,
                                   bool training_mode) {
+  
+  auto start = std::chrono::high_resolution_clock::now();
+
   CHECK_INPUT(input);
   CHECK_INPUT(input_mask);
+  
+  auto output = torch::empty_like(input);
 
   const char *input_ptr = (const char *)input.data_ptr();
   const char *input_mask_ptr = (const char *)input_mask.data_ptr();
@@ -105,7 +115,55 @@ void transformer_encoder_layer_fw(int layer_id, torch::Tensor &output,
 
   layer->forward();
 
-  return;
+  print_time_duration(start, "one forward duration", layer->_context_ptr->get_stream());
+
+  return {output};
+}
+
+
+template <typename T1, typename T2>
+std::vector<torch::Tensor> transformer_encoder_layer_bw(
+    int layer_id, const torch::Tensor &grad_out,
+    const torch::Tensor &output, const torch::Tensor &input,
+    const torch::Tensor &input_mask) {
+  
+  auto start = std::chrono::high_resolution_clock::now();
+
+  CHECK_INPUT(grad_out);
+  CHECK_INPUT(output);
+  CHECK_INPUT(input);
+  CHECK_INPUT(input_mask);
+
+  auto grad_inp = torch::empty_like(grad_out);
+
+  // inputs.
+  char* grad_output_ptr = (char* )grad_out.data_ptr();
+  const char* input_ptr = (const char* )input.data_ptr();
+  const char* output_ptr = (const char* )output.data_ptr();
+  const char* input_mask_ptr = (const char* )input_mask.data_ptr();
+
+  // outputs.
+  char* grad_input_ptr = (char* )grad_inp.data_ptr();
+
+  std::shared_ptr<TransformerEncoderLayer<T1, T2>> layer =
+      std::static_pointer_cast<TransformerEncoderLayer<T1, T2>>(
+          s_transformer_encoder_layers[layer_id]);
+
+  Variable *inp_node = layer->input(0);
+  inp_node->set_value(input_ptr);
+  inp_node->set_grad(grad_input_ptr);
+  Variable *inp_mask_node = layer->input(1);
+  inp_mask_node->set_value(input_mask_ptr);
+
+  Variable *out_node = layer->output(0);
+  out_node->set_value(output_ptr);
+  out_node->set_grad(grad_output_ptr);
+
+
+  layer->backward();
+
+  print_time_duration(start, "one backward duration", layer->_context_ptr->get_stream());
+  return {grad_inp};
 }
 
 }  // namespace lightseq
@@ -123,5 +181,12 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         "LightSeq Transformer Encoder forward with fp32 (CUDA)");
   m.def("transformer_encoder_layer_fw_fp16",
         &lightseq::transformer_encoder_layer_fw<__half, __half>,
+        "LightSeq Transformer Encoder forward with fp16 (CUDA)");
+
+  m.def("transformer_encoder_layer_bw_fp32",
+        &lightseq::transformer_encoder_layer_bw<float, float>,
+        "LightSeq Transformer Encoder forward with fp32 (CUDA)");
+  m.def("transformer_encoder_layer_bw_fp16",
+        &lightseq::transformer_encoder_layer_bw<__half, __half>,
         "LightSeq Transformer Encoder forward with fp16 (CUDA)");
 }
