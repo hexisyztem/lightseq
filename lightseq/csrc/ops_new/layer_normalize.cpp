@@ -81,6 +81,7 @@ void LayerNormalizeOp<T1, T2>::backward() {
 #ifdef DEBUG
   if (_context_ptr->built()) {
     cudaStreamSynchronize(_context_ptr->get_stream());
+    printf("%s backward:\n", name().c_str());
     print_vec(inp_grad, "inp_grad", 10);
     print_vec(out_grad, "out_grad", 10);
     printf("\n");

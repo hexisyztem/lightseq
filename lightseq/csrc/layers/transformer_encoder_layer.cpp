@@ -330,6 +330,13 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
                             _cublasHandle, _stream, grad_input_buf_ptr, nullptr,
                             false);
 
+  cudaStreamSynchronize(_stream);
+  printf("attn out_linear\n");
+  print_vec(grad_input_ptr, "grad_input_ptr", 10);
+  print_vec(_attn_o_inp_ptr, "_attn_o_inp_ptr", 10);
+  print_vec(grad_input_buf_ptr, "grad_input_buf_ptr", 10);
+  printf("\n");
+
   if (_enable_quant) {
     launch_d_cmax(_grad_attn_ow_ptr, static_cast<T *>(nullptr),
                   _attn_dropout.get_mask(), _hidden_size * _hidden_size, 4,
@@ -369,6 +376,13 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
                        _attn_qkvw_ptr, _grad_attn_qkvw_ptr, _grad_attn_qkvb_ptr,
                        _cublasHandle, _stream, grad_input_buf_ptr);
 
+  cudaStreamSynchronize(_stream);
+  printf("attn qkv\n");
+  print_vec(grad_qkv_4d_ptr, "grad_qkv_4d_ptr", 10);
+  print_vec(gemmQKV_inp_ptr, "gemmQKV_inp_ptr", 10);
+  print_vec(grad_input_buf_ptr, "grad_input_buf_ptr", 10);
+  printf("\n");
+
   if (_pre_or_postLayerNorm) {
     if (_enable_quant) {
       launch_d_cmax(_grad_attn_qkvw_ptr, static_cast<T *>(nullptr),
@@ -385,6 +399,13 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
       _attn_ln.Backward(_grad_attn_nw_ptr, _grad_attn_nb_ptr, grad_input_ptr,
                         grad_input_buf_ptr, grad_output_ptr, gemmQKV_inp_ptr,
                         _attn_nw_ptr, _attn_nb_ptr, _batch_tokens, streams);
+
+      cudaStreamSynchronize(_stream);
+      printf("attn Normalize_Layer backward\n");
+      print_vec(grad_input_ptr, "grad_input_ptr", 10);
+      print_vec(grad_input_buf_ptr, "grad_input_buf_ptr", 10);
+      print_vec(grad_output_ptr, "grad_residual_ptr", 10);
+      printf("\n");
     }
   } else {
     if (_enable_quant) {
@@ -400,6 +421,11 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
     launch_fused_add2<T>(grad_input_ptr, grad_input_buf_ptr, grad_residual_ptr,
                          _batch_size, _seq_len, _hidden_size, _stream);
   }
+
+  cudaStreamSynchronize(_stream);
+  print_vec(grad_input_ptr, "finial grad_input_ptr", 10);
+  printf("\n");
+  
 }
 
 template <typename T>
@@ -421,6 +447,10 @@ void TransformerEncoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
     _ffn_dropout.d_bias_dropout_residual(grad_inp_ptr, _grad_output_b_ptr,
                                          grad_output_ptr, _batch_tokens,
                                          _hidden_size, _stream);
+    cudaStreamSynchronize(_stream);
+    print_vec(grad_inp_ptr, "bias dropout residual backward, grad_inp_ptr", 10);
+    printf("\n");
+
   } else {
     _ffn_ln.Backward(_grad_ffn_nw_ptr, _grad_ffn_nb_ptr, grad_residual_ptr,
                      grad_output_ptr, nullptr, output_ptr, _ffn_nw_ptr,
@@ -434,6 +464,13 @@ void TransformerEncoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
                 _grad_output_w_ptr, _grad_output_b_ptr, _cublasHandle, _stream,
                 grad_ff1_out_ptr, nullptr, false);
 
+  cudaStreamSynchronize(_stream);
+  printf("ffn ff2\n");
+  print_vec(grad_inp_ptr, "grad_inp_ptr", 10);
+  print_vec(_ff2_inp_ptr, "_ff2_inp_ptr", 10);
+  print_vec(grad_ff1_out_ptr, "grad_ff1_out_ptr", 10);
+  printf("\n");
+
   if (_enable_quant) {
     launch_d_cmax(_grad_output_w_ptr, static_cast<T *>(nullptr),
                   _ffn_dropout.get_mask(), _hidden_size * _intermediate_size, 4,
@@ -446,13 +483,31 @@ void TransformerEncoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
         _ffn_activation_dropout.get_mask(), _inter_b_ptr, _batch_tokens,
         _intermediate_size, _activation_fn, _stream);
   } else {
+    cudaStreamSynchronize(_stream);
+    printf("ffn _ffn_activation_dropout\n");
+    printf("_rows, _cols: %d %d\n", _batch_tokens, _intermediate_size);
+    print_vec(grad_ff1_out_ptr, "grad_out", 10);
     _ffn_activation_dropout.d_bias_act_dropout(
         grad_ff1_out_ptr, _grad_inter_b_ptr, _relu_inp_ptr, _inter_b_ptr,
         _batch_tokens, _intermediate_size, _activation_fn, _stream);
+    
+    cudaStreamSynchronize(_stream);
+    print_vec(_relu_inp_ptr, "input_ptr", 10);
+    print_vec(_inter_b_ptr, "_inter_b_ptr", 10);
+    print_vec(_grad_inter_b_ptr, "_grad_inter_b", 10);
+    print_vec(grad_ff1_out_ptr, "grad_inp", 10);
+    printf("\n");
   }
   _ff1.Backward(_batch_tokens, grad_ff1_out_ptr, _ff1_inp_ptr, _inter_w_ptr,
                 _grad_inter_w_ptr, _grad_inter_b_ptr, _cublasHandle, _stream,
                 grad_ff1_inp_ptr, nullptr, false);
+
+  cudaStreamSynchronize(_stream);
+  printf("ffn ff1\n");
+  print_vec(grad_ff1_out_ptr, "grad_ff1_out_ptr", 10);
+  print_vec(_ff1_inp_ptr, "_ff1_inp_ptr", 10);
+  print_vec(grad_ff1_inp_ptr, "grad_ff1_inp_ptr", 10);
+  printf("\n");
 
   /* ln signature:
   grad_gamma_grad, grad_betta, grad_inp,
@@ -473,6 +528,13 @@ void TransformerEncoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
       _ffn_ln.Backward(_grad_ffn_nw_ptr, _grad_ffn_nb_ptr, grad_inp_ptr,
                        grad_ff1_inp_ptr, grad_output_ptr, _ff1_inp_ptr,
                        _ffn_nw_ptr, _ffn_nb_ptr, _batch_tokens, streams);
+
+      cudaStreamSynchronize(_stream);
+      printf("ffn Normalize_Layer backward\n");
+      print_vec(grad_inp_ptr, "grad_inp_ptr", 10);
+      print_vec(grad_output_ptr, "grad_residual_ptr", 10);
+      print_vec(grad_ff1_inp_ptr, "grad_out_ptr", 10);
+      printf("\n");
     }
   } else {
     if (_enable_quant) {

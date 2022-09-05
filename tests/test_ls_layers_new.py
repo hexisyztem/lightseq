@@ -85,7 +85,7 @@ def gen_enc_layer_pair():
     return custom_enc_layer_base, custom_enc_layer_new
 
 
-ENC_LAYER_NUM = 1
+ENC_LAYER_NUM = 2
 base_enc_layers = []
 custom_enc_layers = []
 
@@ -107,7 +107,6 @@ def test_encoder_layer_forward():
         res = hidden_states.clone()
         for i in range(ENC_LAYER_NUM):
             res = custom_enc_layers[i](res, self_attn_padding_mask)
-        print("custom ans: ", res)
         return [
             res.contiguous().detach(),
         ]
@@ -116,14 +115,13 @@ def test_encoder_layer_forward():
         res = hidden_states.clone()
         for i in range(ENC_LAYER_NUM):
             res = base_enc_layers[i](res, self_attn_padding_mask)
-        print("baseline ans: ", res)
         return [
             res.contiguous().detach(),
         ]
 
     return custom, baseline
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=1, nrepeat=0)
 def test_encoder_layer_backward():
     batch_size, seq_len = kt.bs_sl() 
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -150,8 +148,9 @@ def test_encoder_layer_backward():
             attn_qkvw, attn_qkvb, attn_ow, attn_ob, attn_nw, attn_nb,
             inter_w, inter_b, output_w, output_b, ffn_nw, ffn_nb
             """
-            # grad_list.extend(None)
-            pass
+            grads = split_custom_layer_grad(custom_enc_layers[i])
+            grad_list.extend(grads[:11])
+
         return grad_list
 
     def baseline():
@@ -169,8 +168,8 @@ def test_encoder_layer_backward():
             attn_qkvw, attn_qkvb, attn_ow, attn_ob, attn_nw, attn_nb,
             inter_w, inter_b, output_w, output_b, ffn_nw, ffn_nb
             """
-            # grad_list.extend(None)
-            pass
+            grads = split_custom_layer_grad(base_enc_layers[i])
+            grad_list.extend(grads[:11])
         return grad_list
 
     return custom, baseline
@@ -180,7 +179,7 @@ if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
         [
-            # "test_encoder_layer_forward",
+            "test_encoder_layer_forward",
             "test_encoder_layer_backward"
         ]
     )

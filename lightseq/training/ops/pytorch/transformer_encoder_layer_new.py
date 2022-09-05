@@ -262,6 +262,9 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
         if self.is_assigned_para_grad == True:
             return 
         self.is_assigned_para_grad = True
+
+        
+
         param = (
             self.para_16
             if self.config.fp16 and self.para.dtype != torch.half

@@ -57,6 +57,22 @@ void BiasActDropoutOp<T1, T2>::backward() {
   } else {
     throw std::runtime_error("not supported activation: " + _activation_fn);
   }
+
+#ifdef DEBUG
+  if (_context_ptr->built()) {
+    cudaStreamSynchronize(stream);
+    printf("%s backward \n", name().c_str());
+    printf("_rows, _cols, ratio: %d %d %f\n", _rows, _cols, RATIO());
+    print_vec(grad_out, "grad_out", 10);
+    print_vec(input, "input_ptr", 10);
+    print_vec(bias, "_inter_b_ptr", 10);
+    print_vec(grad_bias, "_grad_inter_b", 10);
+    print_vec(grad_inp, "grad_inp", 10);
+    print_vec((int*)mask_ptr, "mask_ptr", 10);
+    printf("\n");
+  }
+#endif
+  
 }
 
 template class BiasActDropoutOp<float, float>;

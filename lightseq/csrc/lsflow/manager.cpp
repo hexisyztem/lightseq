@@ -99,6 +99,7 @@ void MemoryManager::calculate_buffer_() {
     int unique_id = iter.first.unique_id;
     tensor_ptr.emplace(unique_id, buffer_ + iter.second);
   }
+  
 
   // Add algorithm check module
   // return true means check success,
@@ -121,8 +122,9 @@ void MemoryManager::calculate_buffer_() {
   std::sort(tensor_usages_vec.begin(), tensor_usages_vec.end(),
             [](const std::pair<TensorUsage, size_t> &x,
                const std::pair<TensorUsage, size_t> &y) -> bool {
-              // return x.first.first_idx < y.first.first_idx;
-              return x.second < y.second;
+              if (x.second != y.second) 
+                return x.second < y.second;
+              return x.first.first_idx < y.first.first_idx;  
             });
   for (auto iter : tensor_usages_vec) {
     int unique_id = iter.first.unique_id;

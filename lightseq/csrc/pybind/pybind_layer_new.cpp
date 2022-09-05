@@ -173,7 +173,7 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
         std::static_pointer_cast<TransformerEncoderLayer<T1, T2>>(
             s_transformer_encoder_layers[layer_id]);
     layer->load_para_and_grad(wptr, gptr);
-    printf("Running assign_layer_weight_grad\n");
+    printf("-----> Running assign_layer_weight_grad %d\n", layer_id);
   } 
   else {
     printf("Error! assign_layer_weight_grad with NULL!");

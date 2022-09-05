@@ -63,6 +63,8 @@ void Dropout<T>::d_bias_act_dropout(T *d_inp_out, T *d_bias_out, const T *input,
                                     const T *bias, int rows, int cols,
                                     std::string activation_fn,
                                     cudaStream_t stream) {
+  cudaStreamSynchronize(stream);
+  print_vec((int*)_mask, "mask_ptr", 10);
   if (activation_fn == "relu") {
     launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, T>(
         d_inp_out, d_bias_out, input, bias, d_inp_out, _mask, rows, cols,
