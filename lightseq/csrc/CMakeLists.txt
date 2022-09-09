@@ -7,12 +7,21 @@ find_package(CUDA 11.6 REQUIRED)
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
 list(APPEND CMAKE_MODULE_PATH ${CUDA_PATH}/lib64)
 
+option(FP16_MODE "inference with fp16" OFF)
 option(DYNAMIC_API "build dynamic lightseq api library" OFF)
 
 # setting compiler flags
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -O0")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -O0")
 set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -g -G -Xcompiler -Wall")
+
+
+if(FP16_MODE)
+  add_definitions(-DFP16_MODE)
+  message(STATUS "Build using fp16 precision")
+else()
+  message(STATUS "Build using fp32 precision")
+endif()
 
 if(DYNAMIC_API)
   # dynamic link to cuda libraries and protobuf
@@ -25,7 +34,11 @@ else()
 endif()
 
 if(DEBUG_MODE)
-  add_definitions(-DDEBUG)
+  if(FP16_MODE)
+    add_definitions(-DDEBUG_TYPE=FP16)
+  else()
+    add_definitions(-DDEBUG_TYPE=FP32)
+  endif()
 endif()
 
 set(Protobuf_USE_STATIC_LIBS ON)

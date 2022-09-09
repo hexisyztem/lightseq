@@ -4,7 +4,7 @@ project(LightSeq LANGUAGES C CXX CUDA)
 set(CMAKE_CUDA_ARCHITECTURES 60 61 70 75 80 86)
 find_package(CUDA 11 REQUIRED)
 
-option(FP16_MODE "inference with fp16" OFF)
+option(FP16_MODE "inference with fp16" ON)
 option(DEBUG_MODE "debug computation result" OFF)
 option(DYNAMIC_API "build dynamic lightseq api library" OFF)
 option(USE_TRITONBACKEND "build tritonbackend for lightseq" OFF)

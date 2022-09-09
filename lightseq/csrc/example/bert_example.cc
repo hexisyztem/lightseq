@@ -1,5 +1,6 @@
 #include "model_base.h"
 #include "util.h"
+#include "cuda_util.h"
 
 /**
 @file
@@ -60,7 +61,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < 10; i++) {
     auto start = std::chrono::high_resolution_clock::now();
     model->Infer();
-    lightseq::print_time_duration(start, "one infer time", 0);
+    print_time_duration(start, "one infer time", 0);
   }
 
   for (int i = 0; i < model->get_output_size(); i++) {
