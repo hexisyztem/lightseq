@@ -40,7 +40,7 @@ class TransformerDecoderLayer : public Layer {
       index 1,
   */
   std::tuple<Variable*, Variable*, Variable*> operator()(
-      Variable* inp, Variable* input_mask, Variable* enc_out,
+      Variable* inp, Variable* enc_out, Variable* enc_mask,
       Variable* cache_self_k, Variable* cache_self_v);
 
   void before_forward(int batch_size, int trg_seq_len, int src_seq_len,

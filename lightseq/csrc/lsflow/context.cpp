@@ -30,6 +30,15 @@ void Context::set_global_context(ContextPtr context_ptr) {
   _global_context_ptr = context_ptr;
 }
 
+std::shared_ptr<Context> Context::global_instance() {
+  return _global_context_ptr;
+}
+
+void Context::update_node_idx(){
+  if (_built) return;
+  _node_idx++;
+}
+
 void Context::add_op(Operator* op) {
   if (is_built()) {
     printf("Context has constructed! should not add new operator!\n");

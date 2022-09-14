@@ -61,9 +61,7 @@ class Context {  // model only
   static void create_global_context(
       StatusType status_type = StatusType::Inference, int device_id = 0);
   static void set_global_context(ContextPtr context_ptr);
-  static std::shared_ptr<Context> global_instance() {
-    return _global_context_ptr;
-  }
+  static std::shared_ptr<Context> global_instance();
 
   // for initial calculation
   size_t mx_tensor_size = 0;
@@ -75,10 +73,7 @@ class Context {  // model only
   // property field
   bool is_training() { return _st == StatusType::Training; }
   int node_idx() { return _node_idx; }
-  void update_node_idx() {
-    if (_built) return;
-    _node_idx++;
-  }
+  void update_node_idx();
   bool is_built() { return _built; }
   bool is_building() { return _building; }
   MemoryManagerPtr memory_manager_ptr() { return _mm_ptr; }

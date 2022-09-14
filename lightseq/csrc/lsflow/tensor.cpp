@@ -21,10 +21,6 @@ void Tensor::set_tensor(char* inp) {
     printf("set_tensor for %s, which is SharedMemory!\n", _name.c_str());
     exit(-1);
   }
-  // if (!inp) {
-  //   printf("set_tensor for %s with nullptr!\n", _name.c_str());
-  //   exit(-1);
-  // }
   _ptr = inp;
 }
 
@@ -33,10 +29,6 @@ void Tensor::set_tensor(const char* inp) { set_tensor(const_cast<char*>(inp)); }
 char* Tensor::tensor(bool is_open_interval, bool just_view) {
   if (_mtype == LSMemoryType::FixedMemory) {
     if (!_ctx_ptr->is_built() && _ptr == nullptr) {
-      printf(
-          "_mtype: %d, tensor name: %s, tensor_ptr: %p, _ctx_ptr->built(): "
-          "%d\n",
-          _mtype, _name.c_str(), _ptr, _ctx_ptr->is_built());
       return _ctx_ptr->temporary_buffer_;
     }
     return _ptr;

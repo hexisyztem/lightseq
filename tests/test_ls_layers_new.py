@@ -101,72 +101,6 @@ for _ in range(NUM_LAYERS):
     custom_enc_layers.append(custom_enc)
 
 
-###################### generate decoder layers ######################
-
-
-def generate_dec_layer(initial_weights=None, initial_biases=None):
-    config = LSTransformerDecoderLayer.get_config(
-        max_batch_tokens=max_batch_tokens,
-        max_seq_len=max_seq_len,
-        hidden_size=1024,
-        intermediate_size=4096,
-        nhead=16,
-        attn_prob_dropout_ratio=0.0,
-        activation_dropout_ratio=0.0,
-        hidden_dropout_ratio=0.0,
-        pre_layer_norm=True,
-        fp16=True,
-        local_rank=0,
-        nlayer=NUM_LAYERS,
-        activation_fn="relu",
-    )
-    layer = LSTransformerDecoderLayer(
-        config,
-        initial_weights,
-        initial_biases,
-    )
-    layer.to(torch.device("cuda:0"), dtype=torch.half)
-    return layer
-
-
-custom_dec_layer_list = []
-fairseq_dec_layer_list = []
-_initial_dec_weights_list = []
-_initial_dec_biases_list = []
-_initial_encdec_attn_kvw_list = []
-_initial_encdec_attn_kvb_list = []
-
-for _ in range(NUM_LAYERS):
-    fairseq_dec_layer = fairseq_layers.generate_dec_layer()
-    fairseq_dec_layer.train()
-    initial_dec_weights, initial_dec_biases = get_fairseq_dec_params(fairseq_dec_layer)
-    fairseq_dec_layer_list.append(fairseq_dec_layer)
-    _initial_dec_weights_list.append(initial_dec_weights)
-    _initial_dec_biases_list.append(initial_dec_biases)
-    _initial_encdec_attn_kvw_list.append(initial_dec_weights[6])
-    _initial_encdec_attn_kvw_list.append(initial_dec_weights[7])
-    _initial_encdec_attn_kvb_list.append(initial_dec_biases[6])
-    _initial_encdec_attn_kvb_list.append(initial_dec_biases[7])
-
-_initial_encdec_attn_kvw = torch.cat(_initial_encdec_attn_kvw_list, dim=0)
-_initial_encdec_attn_kvb = torch.cat(_initial_encdec_attn_kvb_list, dim=0)
-
-for i in range(NUM_LAYERS):
-    _initial_dec_weights_list[i].pop(7)
-    _initial_dec_weights_list[i].pop(6)
-    if i == 0:
-        _initial_dec_weights_list[i].append(_initial_encdec_attn_kvw)
-    _initial_dec_biases_list[i].pop(7)
-    _initial_dec_biases_list[i].pop(6)
-    if i == 0:
-        _initial_dec_biases_list[i].append(_initial_encdec_attn_kvb)
-    custom_dec_layer = generate_dec_layer(
-        _initial_dec_weights_list[i], _initial_dec_biases_list[i]
-    )
-    custom_dec_layer.train()
-    custom_dec_layer_list.append(custom_dec_layer)
-
-
 @kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
 def test_encoder_layer_forward():
     batch_size, seq_len = kt.bs_sl()
@@ -246,6 +180,73 @@ def test_encoder_layer_backward():
         return grad_list
 
     return custom, baseline
+
+
+###################### generate decoder layers ######################
+
+
+def generate_dec_layer(initial_weights=None, initial_biases=None):
+    config = LSTransformerDecoderLayer.get_config(
+        max_batch_tokens=max_batch_tokens,
+        max_seq_len=max_seq_len,
+        hidden_size=1024,
+        intermediate_size=4096,
+        nhead=16,
+        attn_prob_dropout_ratio=0.0,
+        activation_dropout_ratio=0.0,
+        hidden_dropout_ratio=0.0,
+        pre_layer_norm=True,
+        fp16=True,
+        local_rank=0,
+        nlayer=NUM_LAYERS,
+        activation_fn="relu",
+    )
+    layer = LSTransformerDecoderLayer(
+        config,
+        initial_weights,
+        initial_biases,
+    )
+    layer.to(torch.device("cuda:0"), dtype=torch.half)
+    return layer
+
+
+custom_dec_layer_list = []
+fairseq_dec_layer_list = []
+_initial_dec_weights_list = []
+_initial_dec_biases_list = []
+_initial_encdec_attn_kvw_list = []
+_initial_encdec_attn_kvb_list = []
+
+for _ in range(NUM_LAYERS):
+    fairseq_dec_layer = fairseq_layers.generate_dec_layer()
+    fairseq_dec_layer.train()
+    initial_dec_weights, initial_dec_biases = get_fairseq_dec_params(fairseq_dec_layer)
+    fairseq_dec_layer_list.append(fairseq_dec_layer)
+    _initial_dec_weights_list.append(initial_dec_weights)
+    _initial_dec_biases_list.append(initial_dec_biases)
+    _initial_encdec_attn_kvw_list.append(initial_dec_weights[6])
+    _initial_encdec_attn_kvw_list.append(initial_dec_weights[7])
+    _initial_encdec_attn_kvb_list.append(initial_dec_biases[6])
+    _initial_encdec_attn_kvb_list.append(initial_dec_biases[7])
+
+_initial_encdec_attn_kvw = torch.cat(_initial_encdec_attn_kvw_list, dim=0)
+_initial_encdec_attn_kvb = torch.cat(_initial_encdec_attn_kvb_list, dim=0)
+
+for i in range(NUM_LAYERS):
+    _initial_dec_weights_list[i].pop(7)
+    _initial_dec_weights_list[i].pop(6)
+    if i == 0:
+        _initial_dec_weights_list[i].append(_initial_encdec_attn_kvw)
+    _initial_dec_biases_list[i].pop(7)
+    _initial_dec_biases_list[i].pop(6)
+    if i == 0:
+        _initial_dec_biases_list[i].append(_initial_encdec_attn_kvb)
+    custom_dec_layer = generate_dec_layer(
+        _initial_dec_weights_list[i], _initial_dec_biases_list[i]
+    )
+    custom_dec_layer.train()
+    custom_dec_layer_list.append(custom_dec_layer)
+
 
 
 if __name__ == "__main__":
