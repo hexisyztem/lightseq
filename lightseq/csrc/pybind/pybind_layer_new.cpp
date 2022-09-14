@@ -49,7 +49,7 @@ int create_transformer_encoder_layer_new(
   Variable *inp(new Variable("input"));
   Variable *inp_mask(new Variable("inp_mask"));
 
-  Variable *layer_out = (*layer)(inp, inp_mask);
+  (*layer)(inp, inp_mask);
 
   Context::regist_pybind_layer("TransformerEncoderLayer", layer_id, layer);
 
@@ -144,8 +144,6 @@ int create_transformer_decoder_layer(
     float attn_prob_dropout_ratio, float activation_dropout_ratio,
     float hidden_dropout_ratio, bool pre_or_postLayerNorm,
     std::string activation_fn) {
-  // necessary
-  ContextInitial();
 
   auto layer = std::make_shared<TransformerDecoderLayer<T1, T2>>(
       nshared_layer, layer_id, max_batch_tokens, max_seq_len, hidden_dim,
@@ -161,7 +159,7 @@ int create_transformer_decoder_layer(
   Variable *cache_self_k = new Variable("cache_self_k");
   Variable *cache_self_v = new Variable("cache_self_v");
 
-  Variable *dec_out = (*layer)(dec_inp, enc_out, enc_mask, cache_self, cache_self_v);
+  (*layer)(dec_inp, enc_out, enc_mask, cache_self_k, cache_self_v);
 
   layer->before_forward(1, 32, 32, -1);
 
@@ -188,32 +186,27 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
   const char *enc_mask_ptr = (const char *)enc_mask.data_ptr();
 
   auto dec_output = torch::empty_like(dec_input);
-  T *dec_output_ptr = (T *)dec_output.data_ptr();
+  char *dec_output_ptr = (char *)dec_output.data_ptr();
 
-  std::shared_ptr<TransformerDecoderLayer<T>> layer =
-      std::static_pointer_cast<TransformerDecoderLayer<T>>(
+  std::shared_ptr<TransformerDecoderLayer<T1, T2>> layer =
+      std::static_pointer_cast<TransformerDecoderLayer<T1, T2>>(
           Context::get_pybind_layer("TransformerDecoderLayer", layer_id));
 
   int batch_size = enc_output.size(0);
   int trg_seq_len = dec_input.size(1);
   int src_seq_len = enc_output.size(1);
   int step = -1;
-  std::vector<T *> cache_ptr;
+  std::vector<char *> cache_ptr;
   if (cache.size() > 0) {
     trg_seq_len = dec_input.size(0) / batch_size;  // beam_size
     step = cache[0].size(2) - 1;
-    cache_ptr[0] = (T *)cache[0].data_ptr();  // new dec-self-attn k
-    cache_ptr[1] = (T *)cache[1].data_ptr();  // new dec-self-attn v
+    cache_ptr[0] = (char *)cache[0].data_ptr();  // new dec-self-attn k
+    cache_ptr[1] = (char *)cache[1].data_ptr();  // new dec-self-attn v
     if (step > 0) {
-      cache_ptr[2] = (T *)cache[2].data_ptr();  // old dec-self-attn k
-      cache_ptr[3] = (T *)cache[3].data_ptr();  // old dec-self-attn v
+      cache_ptr[2] = (char *)cache[2].data_ptr();  // old dec-self-attn k
+      cache_ptr[3] = (char *)cache[3].data_ptr();  // old dec-self-attn v
     }
   }
-
-
-  std::shared_ptr<TransformerDecoderLayer<T1, T2>> layer =
-      std::static_pointer_cast<TransformerDecoderLayer<T1, T2>>(
-          Context::get_pybind_layer("TransformerDecoderLayer", layer_id));
 
   Variable* inp_node = layer->input(0);
   inp_node->set_value(dec_input_ptr);
@@ -221,11 +214,18 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
   enc_out_node->set_value(enc_output_ptr);
   Variable* enc_mask_node = layer->input(2);
   enc_mask_node->set_value(enc_mask_ptr);
-
-  Variable* old_cache_k = layer->output(0);
+  Variable* old_cache_k = layer->input(3);
   old_cache_k->set_value(cache_ptr[2]);
-  Variable* old_cache_v = layer->output(1);
+  Variable* old_cache_v = layer->output(4);
   old_cache_v->set_value(cache_ptr[3]);
+
+
+  Variable* dec_out = layer->output(0);
+  dec_out->set_value(dec_output_ptr);
+  Variable* new_cache_k = layer->output(1);
+  new_cache_k->set_value(cache_ptr[0]);
+  Variable* new_cache_v = layer->output(2);
+  new_cache_v->set_value(cache_ptr[1]);
 
   layer->before_forward(batch_size, trg_seq_len, src_seq_len, step);
 
