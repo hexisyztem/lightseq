@@ -1,3 +1,4 @@
+/* Copyright 2022 The LightSeq Team */
 #pragma once
 #include "cstdio"
 #include "queue"
@@ -78,7 +79,8 @@ class Context {  // model only
     if (_built) return;
     _node_idx++;
   }
-  bool built() { return _built; }
+  bool is_built() { return _built; }
+  bool is_building() { return _building; }
   MemoryManagerPtr memory_manager_ptr() { return _mm_ptr; }
 
   void add_op(Operator* op);

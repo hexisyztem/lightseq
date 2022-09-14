@@ -7,7 +7,7 @@ DecEncAttentionLayer<T1, T2>::DecEncAttentionLayer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
     int num_heads, float attn_prob_dropout_ratio,
     float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
-    bool mask_future_tokens, bool is_post_ln)
+    bool is_post_ln)
     : Layer("DecEncAttentionLayer"),  // necessary
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
@@ -27,8 +27,7 @@ DecEncAttentionLayer<T1, T2>::DecEncAttentionLayer(
           max_batch_tokens * num_heads * max_seq_len,
           (T1(1.0) / T1(sqrt(hidden_size / num_heads))), T1(0.0), CUBLAS_OP_T,
           CUBLAS_OP_N)),
-      _softmax(new SoftmaxOp<T1, T2>(max_batch_tokens, max_seq_len, num_heads,
-                                     mask_future_tokens)),
+      _softmax(new SoftmaxOp<T1, T2>(max_batch_tokens, max_seq_len, num_heads)),
       _attn_prob_dropout(new DropoutOp<T1, T2>(
           attn_prob_dropout_ratio, max_batch_tokens * num_heads * max_seq_len)),
       _attn_context(new StridedBatchGemmOp<T1, T2>(
@@ -121,14 +120,14 @@ void DecEncAttentionLayer<T1, T2>::before_forward(int batch_size,
   _bias_add_transform_20314_q->before_forward(batch_size, trg_seq_len);
 
   _attn_scores->before_forward(src_seq_len, trg_seq_len, _hidden_size / _heads,
-                               _batch_heads);
+                               _batch_heads, _layer_id);
 
   _softmax->before_forward(batch_size, trg_seq_len, src_seq_len);
 
   _attn_prob_dropout->before_forward(_batch_heads * trg_seq_len * src_seq_len);
 
   _attn_context->before_forward(_hidden_size / _heads, trg_seq_len, src_seq_len,
-                                _batch_heads);
+                                _batch_heads, _layer_id);
 
   _transform_0213->before_forward(batch_size, trg_seq_len);
 

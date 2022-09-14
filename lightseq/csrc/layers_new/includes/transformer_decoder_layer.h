@@ -26,12 +26,11 @@ class TransformerDecoderLayer : public Layer {
 
  public:
   TransformerDecoderLayer(int nshared_layer, int layer_id, int max_batch_tokens,
-                          int max_seq_len, int hidden_size, int num_heads,
-                          int intermediate_size, float attn_prob_dropout_ratio,
-                          float activation_dropout_ratio,
+                          int _max_seq_len, int hidden_size, int num_heads,
+                          int intermediate_size, float attn_dropout_ratio,
                           float hidden_output_dropout_ratio,
-                          bool pre_or_postLayerNorm, std::string activation_fn,
-                          bool mask_future_tokens, bool is_post_ln = false);
+                          float activation_dropout_ratio,
+                          bool pre_or_postLayerNorm, std::string activation_fn);
 
   virtual ~TransformerDecoderLayer() {}
 

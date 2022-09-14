@@ -6,9 +6,9 @@ template <typename T1, typename T2>
 TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
     int nshared_layer, int layer_id, int max_batch_tokens, int max_seq_len,
     int hidden_size, int num_heads, int intermediate_size,
-    float attn_prob_dropout_ratio, float activation_dropout_ratio,
-    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
-    std::string activation_fn, bool mask_future_tokens, bool is_post_ln)
+    float attn_dropout_ratio, float hidden_output_dropout_ratio,
+    float activation_dropout_ratio, bool pre_or_postLayerNorm,
+    std::string activation_fn)
     : Layer("TransformerDecoderLayer"),
       _layer_id(layer_id),
       _nshared_layer(nshared_layer),
@@ -21,18 +21,16 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
 
   _self_attn_layer.reset(new DecSelfAttentionLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
-      attn_prob_dropout_ratio, hidden_output_dropout_ratio,
-      pre_or_postLayerNorm, mask_future_tokens, is_post_ln));
+      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm));
 
   _enc_attn_layer.reset(new DecEncAttentionLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
-      attn_prob_dropout_ratio, hidden_output_dropout_ratio,
-      pre_or_postLayerNorm, mask_future_tokens, is_post_ln));
+      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm));
 
   _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
       intermediate_size, activation_dropout_ratio, hidden_output_dropout_ratio,
-      pre_or_postLayerNorm, activation_fn, is_post_ln));
+      pre_or_postLayerNorm, activation_fn));
 
   if (_encdec_kv_buffer == nullptr) {
     _encdec_kv_buffer =
@@ -110,10 +108,9 @@ void TransformerDecoderLayer<T1, T2>::before_forward(int batch_size,
                                                      int step) {
   _step = step;
 
-  if(step < 0) {
+  if (step < 0) {
     _context_ptr->convert_into_train();
-  }
-  else {
+  } else {
     _context_ptr->convert_into_eval();
   }
 

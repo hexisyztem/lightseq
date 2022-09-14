@@ -7,7 +7,7 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
     int num_heads, float attn_prob_dropout_ratio,
     float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
-    bool mask_future_tokens, bool is_post_ln)
+    bool is_post_ln)
     : Layer("DecSelfAttentionLayer"),  // necessary
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
@@ -29,8 +29,7 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
           max_batch_tokens * num_heads * max_seq_len,
           (T1(1.0) / T1(sqrt(hidden_size / num_heads))), T1(0.0), CUBLAS_OP_T,
           CUBLAS_OP_N)),
-      _softmax(new SoftmaxOp<T1, T2>(max_batch_tokens, max_seq_len, num_heads,
-                                     mask_future_tokens)),
+      _softmax(new SoftmaxOp<T1, T2>(max_batch_tokens, max_seq_len, num_heads)),
       _attn_prob_dropout(new DropoutOp<T1, T2>(
           attn_prob_dropout_ratio, max_batch_tokens * num_heads * max_seq_len)),
       _attn_context(new StridedBatchGemmOp<T1, T2>(

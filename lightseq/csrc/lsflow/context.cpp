@@ -31,7 +31,7 @@ void Context::set_global_context(ContextPtr context_ptr) {
 }
 
 void Context::add_op(Operator* op) {
-  if (built()) {
+  if (is_built()) {
     printf("Context has constructed! should not add new operator!\n");
     exit(-1);
   }
@@ -51,7 +51,7 @@ void Context::add_op(Operator* op) {
 void Context::add_node(Node* node) { _all_node_vec.push_back(node); }
 
 void Context::enter_layer(Layer* cur_layer, bool is_initial) {
-  if (built()) {
+  if (is_built()) {
     printf("Context has constructed! should not modify network\n");
     exit(-1);
   }
@@ -94,12 +94,19 @@ void Context::build() {
 
   for (Layer* rl : _root_layers) {
     rl->gather_root_leaf_var();
+#ifdef DEBUG_TYPE
+    printf("##### Context build layer %s forward #####\n", rl->name().c_str());
+#endif
     rl->forward();
   }
 
   if (is_training()) {
     for (int idx = _root_layers.size() - 1; idx >= 0; idx--) {
       Layer* rl = _root_layers[idx];
+#ifdef DEBUG_TYPE
+      printf("##### Context build layer %s backward #####\n",
+             rl->name().c_str());
+#endif
       rl->backward();
     }
   }

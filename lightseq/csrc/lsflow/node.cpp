@@ -51,7 +51,7 @@ void Node::recursive_forward() {
   forward();
 
 #ifdef DEBUG_TYPE
-  if (node_type() != NodeType::Operator || !_context_ptr->built()) {
+  if (node_type() != NodeType::Operator) {
     return;
   }
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
@@ -87,7 +87,7 @@ void Node::recursive_backward() {
   backward();
 
 #ifdef DEBUG_TYPE
-  if (node_type() != NodeType::Operator || !_context_ptr->built()) {
+  if (node_type() != NodeType::Operator) {
     return;
   }
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));

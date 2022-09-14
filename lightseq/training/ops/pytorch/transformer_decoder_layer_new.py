@@ -63,7 +63,7 @@ class LSTransformerDecoderFunc(Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        cuda_module = transformer_cuda_module
+        cuda_module = layer_cuda_module
         backward_func = (
             cuda_module.transformer_decoder_layer_bw_fp16
             if ctx.config.fp16
@@ -133,14 +133,15 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             torch.cuda.set_device(self.config.local_rank)
 
         # create the layer in cuda kernels.
-        cuda_module = transformer_cuda_module
+        cuda_module = layer_cuda_module
         create_layer_func = (
-            cuda_module.create_transformer_decoder_layer_fp16
+            cuda_module.create_transformer_decoder_layer_new_fp16
             if self.config.fp16
-            else cuda_module.create_transformer_decoder_layer_fp32
+            else cuda_module.create_transformer_decoder_layer_new_fp32
         )
 
         create_layer_func(
+            self.config.nlayer,
             self.config.layer_id,
             self.config.max_batch_tokens,
             self.config.max_seq_len,
@@ -378,7 +379,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         if self.config.layer_id in _all_layer_grads:
             return
         grad = torch.zeros_like(param)
-        cuda_module = transformer_cuda_module
+        cuda_module = layer_cuda_module
         if self.config.fp16:
             func = cuda_module.assign_layer_weight_grad_fp16
         else:

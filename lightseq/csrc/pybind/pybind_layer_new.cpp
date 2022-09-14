@@ -160,7 +160,7 @@ int create_transformer_decoder_layer(
   Variable *cache_self_k = new Variable("cache_self_k");
   Variable *cache_self_v = new Variable("cache_self_v");
 
-  layer->before_forward(1, 32);
+  layer->before_forward(1, 32, 32, -1);
 
   std::string dtype = (std::is_same<T1, __half>::value) ? "half" : "float";
 
@@ -271,6 +271,13 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("transformer_encoder_layer_bw_fp16",
         &lightseq::transformer_encoder_layer_bw<__half, __half>,
         "LightSeq Transformer Encoder forward with fp16 (CUDA)");
+
+  m.def("create_transformer_decoder_layer_new_fp32",
+        &lightseq::create_transformer_decoder_layer<float, float>,
+        "Create LightSeq Transformer Decoder Layer with fp32 (CUDA)");
+  m.def("create_transformer_decoder_layer_new_fp16",
+        &lightseq::create_transformer_decoder_layer<__half, __half>,
+        "Create LightSeq Transformer Decoder Layer with fp16 (CUDA)");
 
   m.def("assign_layer_weight_grad_fp32",
         &lightseq::assign_layer_weight_grad<float, float>,
