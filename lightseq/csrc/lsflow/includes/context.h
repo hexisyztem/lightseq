@@ -26,7 +26,7 @@ class Context {  // model only
   std::vector<Layer*> _root_layers{};
   std::vector<Layer*> _all_layers{};
   std::deque<Layer*> _layer_context;
-  StatusType _st;
+  StatusType _status_type;
 
   bool _built = false;
   bool _building = false;
@@ -71,7 +71,7 @@ class Context {  // model only
   std::map<std::string, int> node_name_cnt;
 
   // property field
-  bool is_training() { return _st == StatusType::Training; }
+  bool is_training() { return _status_type == StatusType::Training; }
   int node_idx() { return _node_idx; }
   void update_node_idx();
   bool is_built() { return _built; }
@@ -98,10 +98,13 @@ class Context {  // model only
                                 : nullptr;
   }
 
+  std::string status_type_str() { return StatusTypeString[_status_type]; }
+
   static void regist_pybind_layer(std::string layer_name, int layer_id,
                                   std::shared_ptr<void> layer_ptr);
   static std::shared_ptr<void> get_pybind_layer(std::string layer_name,
                                                 int layer_id);
+
 };
 
 }  // namespace lightseq

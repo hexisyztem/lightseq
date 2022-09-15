@@ -55,7 +55,8 @@ void Node::recursive_forward() {
     return;
   }
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
-  print_time_duration(start, name() + " Forward ****", 0);
+  printf("##### %s forward #####\n", name().c_str());
+  print_time_duration(start, "time cost", 0);
   Operator* this_op = static_cast<Operator*>(this);
   for (int idx = 0; idx < _parents.size(); idx++) {
     if (_parents[idx] != nullptr && this_op->parent(idx)->value() != nullptr)
@@ -91,7 +92,8 @@ void Node::recursive_backward() {
     return;
   }
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
-  print_time_duration(start, name() + " Backward ****", 0);
+  printf("##### %s backward #####\n", name().c_str());
+  print_time_duration(start, "time cost", 0);
   Operator* this_op = static_cast<Operator*>(this);
   for (int idx = 0; idx < _parents.size(); idx++) {
     if (_parents[idx] != nullptr && this_op->parent(idx)->grad() != nullptr)

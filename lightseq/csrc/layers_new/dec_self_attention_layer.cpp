@@ -119,7 +119,7 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
                                                    int trg_seq_len,
                                                    int src_seq_len, int steps) {
   _src_seq_len = src_seq_len;
-  _trg_seq_len = _trg_seq_len;
+  _trg_seq_len = trg_seq_len;
   _batch_heads = batch_size * _heads;
   _trg_batch_tokens = batch_size * trg_seq_len;
   _batch_dim = _trg_batch_tokens * _hidden_size;
@@ -149,7 +149,7 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
 
   _attn_dropout->before_forward(_trg_batch_tokens, _hidden_size);
 
-  if (steps >= 0) {
+  if (_step >= 0) {
     _attn_scores->before_forward(_step + 1, 1, _hidden_size / _heads,
                                  _batch_heads);
     _attn_context->before_forward(_hidden_size / _heads, 1, _step + 1,

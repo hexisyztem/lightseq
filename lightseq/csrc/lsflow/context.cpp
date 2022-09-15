@@ -3,7 +3,8 @@
 namespace lightseq {
 
 Context::Context(StatusType status_type, int device_id)
-    : _mm_ptr(new MemoryManager()), _device_id(device_id), _st(status_type) {
+    : _mm_ptr(new MemoryManager()), _device_id(device_id), _status_type(status_type) {
+  printf("Initial Context, status_type: %s\n", status_type_str().c_str());
   CHECK_GPU_ERROR(cudaSetDevice(device_id));
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
@@ -16,10 +17,11 @@ Context::~Context() {
   }
 }
 
-void Context::convert_into_train() { _st = StatusType::Training; }
+void Context::convert_into_train() { _status_type = StatusType::Training; }
 
 void Context::convert_into_eval() {
-  if (_st != StatusType::Inference) _st = StatusType::Evaluation;
+  if (_status_type != StatusType::Inference) 
+    _status_type = StatusType::Evaluation;
 }
 
 void Context::create_global_context(StatusType status_type, int device_id) {
@@ -46,7 +48,9 @@ void Context::add_op(Operator* op) {
   }
 
   if (_layer_context.size()) {
-    _layer_context[0]->_op_vec.push_back(op);
+    for(Layer* lyr: _layer_context) {
+      lyr->_op_vec.push_back(op);
+    }
     return;
   }
 #if ONLY_OP == true
@@ -80,8 +84,8 @@ void Context::build() {
   _building = true;
 
   printf("========== start Context build ==========\n");
-  printf("========== construct StatusType: %s ==========\n",
-         StatusTypeString[int(_st)].c_str());
+  printf("========== construct StatusType: %s, StatusType id: %d ==========\n",
+         status_type_str().c_str(), int(_status_type));
 
   if (!check_validate()) {
     printf("Check validate error!\n");
@@ -104,16 +108,17 @@ void Context::build() {
   for (Layer* rl : _root_layers) {
     rl->gather_root_leaf_var();
 #ifdef DEBUG_TYPE
-    printf("##### Context build layer %s forward #####\n", rl->name().c_str());
+    printf("\n########## Context build layer %s forward ##########\n", rl->name().c_str());
 #endif
     rl->forward();
   }
 
   if (is_training()) {
+    printf("is training!\n");
     for (int idx = _root_layers.size() - 1; idx >= 0; idx--) {
       Layer* rl = _root_layers[idx];
 #ifdef DEBUG_TYPE
-      printf("##### Context build layer %s backward #####\n",
+      printf("\n########## Context build layer %s backward ##########\n",
              rl->name().c_str());
 #endif
       rl->backward();

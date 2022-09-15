@@ -172,6 +172,10 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
     _attn_dropout.bias_dropout_residual(output_ptr, output_ptr, input_ptr,
                                         _attn_ob_ptr, _batch_tokens,
                                         _hidden_size, _stream);
+
+    CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+    printf("after attn layer bias_dropout_residual\n");
+    print_vec(output_ptr, "output_ptr", 10);
   }
 
   if (!_pre_or_postLayerNorm) {
@@ -259,6 +263,11 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
 
   _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
                                      _batch_tokens, _hidden_size, _stream);
+
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  printf("after ffn layer bias_dropout_residual\n");
+  print_vec(out_ptr, "out_ptr", 10);
 
   if (!_pre_or_postLayerNorm) {
     // in-place ln since ln-input will not be used in post-ln mode

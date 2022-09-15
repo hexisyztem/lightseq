@@ -161,7 +161,10 @@ int create_transformer_decoder_layer(
 
   (*layer)(dec_inp, enc_out, enc_mask, cache_self_k, cache_self_v);
 
-  layer->before_forward(1, 32, 32, -1);
+  if(Context::global_instance()->is_training())
+    layer->before_forward(1, 32, 32, -1);
+  else 
+    layer->before_forward(1, 32, 32, 0);
 
   std::string dtype = (std::is_same<T1, __half>::value) ? "half" : "float";
 
