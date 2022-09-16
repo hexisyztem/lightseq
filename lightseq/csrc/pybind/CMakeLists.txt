@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.18)
+
+pybind11_add_module(
+  py_lightseq_model
+  MODULE
+  pybind_model.cpp
+)
+
+
+target_link_libraries(py_lightseq_model PUBLIC liblightseq)
+target_link_libraries(py_lightseq_model PUBLIC utils)
+set_target_properties(py_lightseq_model PROPERTIES OUTPUT_NAME inference)

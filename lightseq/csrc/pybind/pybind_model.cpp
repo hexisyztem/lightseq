@@ -22,7 +22,7 @@ class PyTransformer {
     int max_size =
         std::accumulate(max_input_shape.begin(), max_input_shape.end(), 1,
                         std::multiplies<int>());
-    lightseq::cuda::CHECK_GPU_ERROR(
+    CHECK_GPU_ERROR(
         cudaMalloc(&d_input_, sizeof(int) * max_size));
 
     for (int i = 0; i < model_->get_output_size(); i++) {
@@ -30,7 +30,7 @@ class PyTransformer {
       std::vector<int> shape = model_->get_output_max_shape(i);
       int output_size = std::accumulate(shape.begin(), shape.end(), 1,
                                         std::multiplies<int>());
-      lightseq::cuda::CHECK_GPU_ERROR(
+      CHECK_GPU_ERROR(
           cudaMalloc(&d_output, output_size * sizeof(int)));
       model_->set_output_ptr(i, d_output);
       d_outputs_.push_back(d_output);
@@ -38,9 +38,9 @@ class PyTransformer {
   }
   ~PyTransformer() {
     delete model_;
-    lightseq::cuda::CHECK_GPU_ERROR(cudaFree(d_input_));
+    CHECK_GPU_ERROR(cudaFree(d_input_));
     for (auto d_output : d_outputs_) {
-      lightseq::cuda::CHECK_GPU_ERROR(cudaFree(d_output));
+      CHECK_GPU_ERROR(cudaFree(d_output));
     }
   }
 
@@ -51,7 +51,7 @@ class PyTransformer {
     int batch_size = input_seq_out.shape(0);
     int batch_seq_len = input_seq_out.shape(1);
 
-    lightseq::cuda::CHECK_GPU_ERROR(
+    CHECK_GPU_ERROR(
         cudaMemcpy(d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
                    cudaMemcpyHostToDevice));
 
@@ -64,7 +64,7 @@ class PyTransformer {
     auto tokens = py::array_t<int>(output_shape);
     int *tokens_data = tokens.mutable_data(0, 0);
     const int *d_output = static_cast<const int *>(model_->get_output_ptr(0));
-    lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(tokens_data, d_output,
+    CHECK_GPU_ERROR(cudaMemcpy(tokens_data, d_output,
                                                sizeof(int) * tokens.size(),
                                                cudaMemcpyDeviceToHost));
 
@@ -74,7 +74,7 @@ class PyTransformer {
     const float *d_scores =
         static_cast<const float *>(model_->get_output_ptr(1));
 
-    lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(scores_data, d_scores,
+    CHECK_GPU_ERROR(cudaMemcpy(scores_data, d_scores,
                                                sizeof(float) * scores.size(),
                                                cudaMemcpyDeviceToHost));
     return std::make_tuple(tokens, scores);
@@ -95,7 +95,7 @@ class PyBert {
     int max_size =
         std::accumulate(max_input_shape.begin(), max_input_shape.end(), 1,
                         std::multiplies<int>());
-    lightseq::cuda::CHECK_GPU_ERROR(
+    CHECK_GPU_ERROR(
         cudaMalloc(&d_input_, sizeof(int) * max_size));
 
     for (int i = 0; i < model_->get_output_size(); i++) {
@@ -103,7 +103,7 @@ class PyBert {
       std::vector<int> shape = model_->get_output_max_shape(i);
       int output_size = std::accumulate(shape.begin(), shape.end(), 1,
                                         std::multiplies<int>());
-      lightseq::cuda::CHECK_GPU_ERROR(
+      CHECK_GPU_ERROR(
           cudaMalloc(&d_output, output_size * sizeof(int)));
       model_->set_output_ptr(i, d_output);
       d_outputs_.push_back(d_output);
@@ -111,9 +111,9 @@ class PyBert {
   }
   ~PyBert() {
     delete model_;
-    lightseq::cuda::CHECK_GPU_ERROR(cudaFree(d_input_));
+    CHECK_GPU_ERROR(cudaFree(d_input_));
     for (auto d_output : d_outputs_) {
-      lightseq::cuda::CHECK_GPU_ERROR(cudaFree(d_output));
+      CHECK_GPU_ERROR(cudaFree(d_output));
     }
   }
 
@@ -124,7 +124,7 @@ class PyBert {
     int batch_size = input_seq_out.shape(0);
     int batch_seq_len = input_seq_out.shape(1);
 
-    lightseq::cuda::CHECK_GPU_ERROR(
+    CHECK_GPU_ERROR(
         cudaMemcpy(d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
                    cudaMemcpyHostToDevice));
 
@@ -141,14 +141,14 @@ class PyBert {
       const float *d_output =
           static_cast<const float *>(model_->get_output_ptr(0));
 
-      lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(output_data, d_output,
+      CHECK_GPU_ERROR(cudaMemcpy(output_data, d_output,
                                                  sizeof(float) * output.size(),
                                                  cudaMemcpyDeviceToHost));
     } else if (output_type == lightseq::cuda::kFloat16) {
       const half *d_output =
           static_cast<const half *>(model_->get_output_ptr(0));
       std::vector<half> h_bert_out(output.size());
-      lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(h_bert_out.data(), d_output,
+      CHECK_GPU_ERROR(cudaMemcpy(h_bert_out.data(), d_output,
                                                  sizeof(half) * output.size(),
                                                  cudaMemcpyDeviceToHost));
       for (auto i = 0; i < h_bert_out.size(); i++) {
@@ -166,11 +166,11 @@ class PyBert {
 PYBIND11_MODULE(inference, m) {
   m.attr("__name__") = "lightseq.inference";
   
-  py::class_<PyTransformer>(m, "Transformer")
-      .def(py::init<const std::string, const int>(), py::arg("weight_path"),
-           py::arg("max_batch_size"))
-      .def("infer", &PyTransformer::infer,
-           py::return_value_policy::reference_internal, py::arg("input_seq"));
+  // py::class_<PyTransformer>(m, "Transformer")
+  //     .def(py::init<const std::string, const int>(), py::arg("weight_path"),
+  //          py::arg("max_batch_size"))
+  //     .def("infer", &PyTransformer::infer,
+  //          py::return_value_policy::reference_internal, py::arg("input_seq"));
 
   py::class_<PyBert>(m, "Bert")
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),
