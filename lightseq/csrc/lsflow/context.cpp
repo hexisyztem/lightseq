@@ -5,7 +5,7 @@ namespace lightseq {
 Context::Context(StatusType status_type, int device_id)
     : _mm_ptr(new MemoryManager()), _device_id(device_id), _status_type(status_type) {
   printf("Initial Context, status_type: %s\n", status_type_str().c_str());
-  CHECK_GPU_ERROR(cudaSetDevice(device_id));
+  // CHECK_GPU_ERROR(cudaSetDevice(device_id));
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
   CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
@@ -17,6 +17,11 @@ Context::~Context() {
   }
 }
 
+void Context::set_stream(cudaStream_t stream) {
+  _stream = stream;
+  CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
+}
+
 void Context::convert_into_train() { _status_type = StatusType::Training; }
 
 void Context::convert_into_eval() {
@@ -24,12 +29,21 @@ void Context::convert_into_eval() {
     _status_type = StatusType::Evaluation;
 }
 
-void Context::create_global_context(StatusType status_type, int device_id) {
-  _global_context_ptr.reset(new Context(status_type, device_id));
+int Context::create_global_context(StatusType status_type, int device_id) {
+  global_context_id ++;
+  std::shared_ptr<Context> new_context = std::make_shared<Context>(status_type, device_id);
+  _global_context_ptr = new_context;
+  global_contexts_map.emplace(global_context_id, new_context);
+  return global_context_id;
 }
 
-void Context::set_global_context(ContextPtr context_ptr) {
-  _global_context_ptr = context_ptr;
+void Context::set_global_context(int context_id) {
+  auto iter = global_contexts_map.find(context_id);
+  if(iter == global_contexts_map.end()) {
+    printf("Error occured! context_id %d does not exist!\n", context_id);
+    exit(-1);
+  }
+  _global_context_ptr = iter->second;
 }
 
 std::shared_ptr<Context> Context::global_instance() {
@@ -191,5 +205,7 @@ std::shared_ptr<void> Context::get_pybind_layer(std::string layer_name,
 std::shared_ptr<Context> Context::_global_context_ptr = nullptr;
 std::unordered_map<std::string, std::shared_ptr<void>> Context::pybind_layers =
     {};
+std::unordered_map<int, std::shared_ptr<Context>> Context::global_contexts_map = {};
+int Context::global_context_id = 0;
 
 }  // namespace lightseq

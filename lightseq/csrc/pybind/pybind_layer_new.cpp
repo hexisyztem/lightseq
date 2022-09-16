@@ -27,10 +27,21 @@ T *rptr(torch::Tensor &tensor) {
   return reinterpret_cast<T *>(tensor.data_ptr());
 }
 
-void ContextInitial() {
+int create_global_context(bool is_training = true) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  Context::create_global_context(StatusType::Training);
+  
+  int context_id;
+  if(is_training)
+    context_id = Context::create_global_context(StatusType::Training);
+  else 
+    context_id = Context::create_global_context(StatusType::Inference);
+    
   Context::global_instance()->set_stream(stream);
+  return context_id;
+}
+
+void set_global_context(int context_id) {
+  Context::set_global_context(context_id);
 }
 
 template <typename T1, typename T2>
@@ -264,7 +275,16 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
 }  // namespace lightseq
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-  lightseq::ContextInitial();
+  
+  // create default context
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  lightseq::Context::create_global_context(lightseq::StatusType::Training);
+  lightseq::Context::global_instance()->set_stream(stream);
+
+  m.def("create_global_context", &lightseq::create_global_context,
+        "Create Lightseq Context");
+  m.def("set_global_context", &lightseq::set_global_context,
+        "Set Lightseq Context");
 
   m.def("create_transformer_encoder_layer_new_fp32",
         &lightseq::create_transformer_encoder_layer_new<float, float>,

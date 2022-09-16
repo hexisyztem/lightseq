@@ -42,6 +42,9 @@ class Context {  // model only
 
   bool check_validate();
 
+  static std::unordered_map<int, std::shared_ptr<Context>> global_contexts_map;
+  static int global_context_id;
+
  public:
   Context(StatusType status_type = StatusType::Inference, int device_id = 0);
   virtual ~Context();
@@ -50,17 +53,14 @@ class Context {  // model only
 
   cublasHandle_t get_cublashandle() { return _cublasHandle; }
 
-  void set_stream(cudaStream_t stream) {
-    _stream = stream;
-    CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
-  }
+  void set_stream(cudaStream_t stream);
 
   void convert_into_train();
   void convert_into_eval();
 
-  static void create_global_context(
+  static int create_global_context(
       StatusType status_type = StatusType::Inference, int device_id = 0);
-  static void set_global_context(ContextPtr context_ptr);
+  static void set_global_context(int context_id);
   static std::shared_ptr<Context> global_instance();
 
   // for initial calculation

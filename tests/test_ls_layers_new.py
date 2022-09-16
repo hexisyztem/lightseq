@@ -24,6 +24,7 @@ from lightseq.training.ops.pytorch.transformer_encoder_layer_new import (
 from lightseq.training.ops.pytorch.transformer_encoder_layer import (
     LSTransformerEncoderLayer,
 )
+from lightseq.training.ops.pytorch import layer_cuda_module
 
 from lightseq.training.ops.pytorch.transformer_decoder_layer_new import (
     LSTransformerDecoderLayer,
@@ -94,6 +95,8 @@ def gen_enc_layer_pair():
 NUM_LAYERS = 2
 base_enc_layers = []
 custom_enc_layers = []
+
+enc_context_id = layer_cuda_module.create_global_context(True)
 
 for _ in range(NUM_LAYERS):
     base_enc, custom_enc = gen_enc_layer_pair()
@@ -232,6 +235,8 @@ for _ in range(NUM_LAYERS):
 _initial_encdec_attn_kvw = torch.cat(_initial_encdec_attn_kvw_list, dim=0)
 _initial_encdec_attn_kvb = torch.cat(_initial_encdec_attn_kvb_list, dim=0)
 
+dec_context_id = layer_cuda_module.create_global_context(True)
+
 for i in range(NUM_LAYERS):
     _initial_dec_weights_list[i].pop(7)
     _initial_dec_weights_list[i].pop(6)
@@ -254,7 +259,7 @@ if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
         [
-            "test_encoder_layer_forward",
+            # "test_encoder_layer_forward",
             # "test_encoder_layer_backward",
         ]
     )
